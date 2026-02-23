@@ -31,7 +31,21 @@
             <div class="grid gap-4 mt-5 lg:grid-cols-3">
                 <div class="overflow-x-auto">
                     <h2 class="text-sm font-semibold mb-2">Activos</h2>
-                    <table class="table">
+                    <div class="space-y-2 md:hidden">
+                        @forelse ($assetRows as $row)
+                            <article class="surface-muted rounded-xl p-3">
+                                <p class="text-sm">{{ $row['account']->code }} - {{ $row['account']->name }}</p>
+                                <p class="text-sm font-semibold mt-1">{{ number_format($row['balance'], 2) }}</p>
+                            </article>
+                        @empty
+                            <p class="text-sm text-base-content/60">Sin saldo.</p>
+                        @endforelse
+                        <article class="rounded-xl border border-base-300 bg-base-100 p-3">
+                            <p class="text-xs text-base-content/60">Total activos</p>
+                            <p class="font-semibold">{{ number_format($totalAssets, 2) }}</p>
+                        </article>
+                    </div>
+                    <table class="table hidden md:table">
                         <thead>
                             <tr>
                                 <th>Cuenta</th>
@@ -61,7 +75,21 @@
 
                 <div class="overflow-x-auto">
                     <h2 class="text-sm font-semibold mb-2">Pasivos</h2>
-                    <table class="table">
+                    <div class="space-y-2 md:hidden">
+                        @forelse ($liabilityRows as $row)
+                            <article class="surface-muted rounded-xl p-3">
+                                <p class="text-sm">{{ $row['account']->code }} - {{ $row['account']->name }}</p>
+                                <p class="text-sm font-semibold mt-1">{{ number_format($row['balance'], 2) }}</p>
+                            </article>
+                        @empty
+                            <p class="text-sm text-base-content/60">Sin saldo.</p>
+                        @endforelse
+                        <article class="rounded-xl border border-base-300 bg-base-100 p-3">
+                            <p class="text-xs text-base-content/60">Total pasivos</p>
+                            <p class="font-semibold">{{ number_format($totalLiabilities, 2) }}</p>
+                        </article>
+                    </div>
+                    <table class="table hidden md:table">
                         <thead>
                             <tr>
                                 <th>Cuenta</th>
@@ -91,7 +119,21 @@
 
                 <div class="overflow-x-auto">
                     <h2 class="text-sm font-semibold mb-2">Patrimonio</h2>
-                    <table class="table">
+                    <div class="space-y-2 md:hidden">
+                        @forelse ($equityRows as $row)
+                            <article class="surface-muted rounded-xl p-3">
+                                <p class="text-sm">{{ $row['account']->code }} - {{ $row['account']->name }}</p>
+                                <p class="text-sm font-semibold mt-1">{{ number_format($row['balance'], 2) }}</p>
+                            </article>
+                        @empty
+                            <p class="text-sm text-base-content/60">Sin saldo.</p>
+                        @endforelse
+                        <article class="rounded-xl border border-base-300 bg-base-100 p-3">
+                            <p class="text-xs text-base-content/60">Total patrimonio</p>
+                            <p class="font-semibold">{{ number_format($totalEquity, 2) }}</p>
+                        </article>
+                    </div>
+                    <table class="table hidden md:table">
                         <thead>
                             <tr>
                                 <th>Cuenta</th>

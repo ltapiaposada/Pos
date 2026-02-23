@@ -51,8 +51,18 @@
         <div class="panel">
             <div class="panel-body">
                 <h2 class="text-sm font-semibold">Ventas por dia</h2>
+                <div class="mt-3 space-y-2 md:hidden">
+                    @forelse ($salesByDay as $row)
+                        <article class="surface-muted rounded-xl p-3 text-sm">
+                            <div class="flex items-center justify-between"><span>{{ $row->day }}</span><span class="font-semibold">${{ number_format($row->total, 2) }}</span></div>
+                            <div class="text-xs text-base-content/60">Ventas: {{ $row->sales_count }}</div>
+                        </article>
+                    @empty
+                        <p class="text-sm text-base-content/60">Sin datos.</p>
+                    @endforelse
+                </div>
                 <div class="overflow-x-auto">
-                    <table class="table table-sm mt-3">
+                    <table class="table table-sm mt-3 hidden md:table">
                         <thead>
                             <tr>
                                 <th>Dia</th>
@@ -81,8 +91,18 @@
         <div class="panel">
             <div class="panel-body">
                 <h2 class="text-sm font-semibold">Ventas por cajero</h2>
+                <div class="mt-3 space-y-2 md:hidden">
+                    @forelse ($salesByCashier as $row)
+                        <article class="surface-muted rounded-xl p-3 text-sm">
+                            <div class="flex items-center justify-between"><span>{{ $row->user?->name ?? 'N/A' }}</span><span class="font-semibold">${{ number_format($row->total, 2) }}</span></div>
+                            <div class="text-xs text-base-content/60">Ventas: {{ $row->sales_count }}</div>
+                        </article>
+                    @empty
+                        <p class="text-sm text-base-content/60">Sin datos.</p>
+                    @endforelse
+                </div>
                 <div class="overflow-x-auto">
-                    <table class="table table-sm mt-3">
+                    <table class="table table-sm mt-3 hidden md:table">
                         <thead>
                             <tr>
                                 <th>Cajero</th>
@@ -111,8 +131,18 @@
         <div class="panel">
             <div class="panel-body">
                 <h2 class="text-sm font-semibold">Top productos</h2>
+                <div class="mt-3 space-y-2 md:hidden">
+                    @forelse ($salesByProduct as $row)
+                        <article class="surface-muted rounded-xl p-3 text-sm">
+                            <div class="flex items-center justify-between"><span>{{ $row->product_name }}</span><span class="font-semibold">${{ number_format($row->total, 2) }}</span></div>
+                            <div class="text-xs text-base-content/60">Cantidad: {{ number_format($row->qty, 3) }}</div>
+                        </article>
+                    @empty
+                        <p class="text-sm text-base-content/60">Sin datos.</p>
+                    @endforelse
+                </div>
                 <div class="overflow-x-auto">
-                    <table class="table table-sm mt-3">
+                    <table class="table table-sm mt-3 hidden md:table">
                         <thead>
                             <tr>
                                 <th>Producto</th>
@@ -141,8 +171,17 @@
         <div class="panel">
             <div class="panel-body">
                 <h2 class="text-sm font-semibold">Pagos por metodo</h2>
+                <div class="mt-3 space-y-2 md:hidden">
+                    @forelse ($salesByPayment as $row)
+                        <article class="surface-muted rounded-xl p-3 text-sm">
+                            <div class="flex items-center justify-between"><span>{{ strtoupper($row->method) }}</span><span class="font-semibold">${{ number_format($row->total, 2) }}</span></div>
+                        </article>
+                    @empty
+                        <p class="text-sm text-base-content/60">Sin datos.</p>
+                    @endforelse
+                </div>
                 <div class="overflow-x-auto">
-                    <table class="table table-sm mt-3">
+                    <table class="table table-sm mt-3 hidden md:table">
                         <thead>
                             <tr>
                                 <th>Metodo</th>

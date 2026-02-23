@@ -15,7 +15,26 @@
 
     <div class="mt-6 panel">
         <div class="panel-body">
-            <div class="overflow-x-auto">
+            <div class="space-y-3 md:hidden">
+                @forelse ($categories as $category)
+                    <article class="surface-muted rounded-2xl p-4">
+                        <p class="text-sm font-semibold">{{ $category->name }}</p>
+                        <p class="mt-1 text-xs text-base-content/60">Padre: {{ $category->parent?->name ?? '-' }}</p>
+                        <div class="mt-3 actions">
+                            <a href="{{ route('categories.edit', $category) }}" class="btn btn-outline-primary btn-xs">Editar</a>
+                            <form action="{{ route('categories.destroy', $category) }}" method="POST" class="inline">
+                                @csrf
+                                @method('DELETE')
+                                <button class="btn btn-outline-danger btn-xs" data-confirm="Eliminar categoria?">Eliminar</button>
+                            </form>
+                        </div>
+                    </article>
+                @empty
+                    <div class="rounded-2xl border border-base-300 bg-base-100 p-5 text-center text-sm text-base-content/60">Sin registros</div>
+                @endforelse
+            </div>
+
+            <div class="overflow-x-auto hidden md:block">
                 <table class="table">
                     <thead>
                         <tr>

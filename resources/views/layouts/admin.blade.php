@@ -469,6 +469,169 @@
 
         <script>
             (function () {
+                const NAV_STATE_KEY = 'admin_intended_navigation_v1';
+                const REBOUND_WINDOW_MS = 8000;
+                const MAX_RETRIES = 1;
+                let isNavigating = false;
+                const DEBUG_FLAG_KEY = 'admin_nav_debug';
+                const debugEnabled = (() => {
+                    try {
+                        return localStorage.getItem(DEBUG_FLAG_KEY) === '1';
+                    } catch (_error) {
+                        return false;
+                    }
+                })();
+
+                function debugLog(eventName, payload = {}) {
+                    if (!debugEnabled) {
+                        return;
+                    }
+                    const timestamp = new Date().toISOString();
+                    console.info(`[admin-nav-debug] ${eventName}`, { timestamp, ...payload });
+                }
+
+                function normalizeUrl(value) {
+                    try {
+                        const url = new URL(value, window.location.origin);
+                        const path = url.pathname.replace(/\/+$/, '') || '/';
+                        return `${path}${url.search}`;
+                    } catch (_error) {
+                        return String(value || '');
+                    }
+                }
+
+                function readNavState() {
+                    try {
+                        const raw = sessionStorage.getItem(NAV_STATE_KEY);
+                        const parsed = raw ? JSON.parse(raw) : null;
+                        debugLog('read-state', { parsed });
+                        return parsed;
+                    } catch (_error) {
+                        debugLog('read-state-error', { message: _error?.message || 'unknown' });
+                        return null;
+                    }
+                }
+
+                function writeNavState(state) {
+                    try {
+                        sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify(state));
+                        debugLog('write-state', { state });
+                    } catch (_error) {
+                        debugLog('write-state-error', { message: _error?.message || 'unknown' });
+                    }
+                }
+
+                function clearNavState() {
+                    try {
+                        sessionStorage.removeItem(NAV_STATE_KEY);
+                        debugLog('clear-state');
+                    } catch (_error) {
+                        debugLog('clear-state-error', { message: _error?.message || 'unknown' });
+                    }
+                }
+
+                // Recovery guard: if the app bounces back to origin after clicking a menu option,
+                // retry navigation once and clear stale state.
+                (function recoverFromRebound() {
+                    const state = readNavState();
+                    if (!state || !state.target || !state.origin || !state.ts) {
+                        debugLog('recover-skip-no-state');
+                        return;
+                    }
+
+                    const now = Date.now();
+                    if ((now - Number(state.ts)) > REBOUND_WINDOW_MS) {
+                        debugLog('recover-expired', { ageMs: now - Number(state.ts) });
+                        clearNavState();
+                        return;
+                    }
+
+                    const current = normalizeUrl(window.location.href);
+                    const target = normalizeUrl(state.target);
+                    const origin = normalizeUrl(state.origin);
+
+                    if (current === target) {
+                        debugLog('recover-target-reached', { current, target });
+                        clearNavState();
+                        return;
+                    }
+
+                    if (current === origin && Number(state.retries || 0) < MAX_RETRIES) {
+                        debugLog('recover-retry', { current, origin, target, retries: state.retries || 0 });
+                        const nextState = {
+                            ...state,
+                            retries: Number(state.retries || 0) + 1,
+                            ts: now,
+                        };
+                        writeNavState(nextState);
+                        window.location.replace(state.target);
+                        return;
+                    }
+
+                    if (Number(state.retries || 0) >= MAX_RETRIES) {
+                        debugLog('recover-max-retries', { retries: state.retries || 0, current, target, origin });
+                        clearNavState();
+                    }
+                })();
+
+                // Safe menu navigation: prevents duplicate/conflicting handlers and stores target.
+                document.addEventListener('click', function (event) {
+                    const link = event.target.closest('.sidebar-wrapper a.nav-link[href]');
+                    if (!link) {
+                        return;
+                    }
+
+                    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                        return;
+                    }
+
+                    const href = link.getAttribute('href') || '';
+                    if (!href || href === '#' || href.startsWith('javascript:')) {
+                        return;
+                    }
+
+                    if (link.target && link.target !== '_self') {
+                        return;
+                    }
+
+                    let targetUrl = '';
+                    try {
+                        targetUrl = new URL(link.href, window.location.origin).toString();
+                    } catch (_error) {
+                        return;
+                    }
+
+                    const currentUrl = new URL(window.location.href, window.location.origin).toString();
+                    if (normalizeUrl(targetUrl) === normalizeUrl(currentUrl)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (typeof event.stopImmediatePropagation === 'function') {
+                        event.stopImmediatePropagation();
+                    }
+
+                    if (isNavigating) {
+                        debugLog('navigate-blocked-already-navigating', { targetUrl });
+                        return;
+                    }
+                    isNavigating = true;
+                    debugLog('navigate-start', { currentUrl, targetUrl });
+
+                    writeNavState({
+                        target: targetUrl,
+                        origin: currentUrl,
+                        ts: Date.now(),
+                        retries: 0,
+                    });
+
+                    window.location.assign(targetUrl);
+                }, true);
+            })();
+        </script>
+        <script>
+            (function () {
                 const body = document.body;
                 if (!body) {
                     return;

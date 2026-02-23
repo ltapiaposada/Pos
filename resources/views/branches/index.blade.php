@@ -15,7 +15,25 @@
 
     <div class="mt-6 panel">
         <div class="panel-body">
-            <div class="overflow-x-auto">
+            <div class="space-y-3 md:hidden">
+                @forelse ($branches as $branch)
+                    <article class="surface-muted rounded-2xl p-4">
+                        <p class="text-sm font-semibold">{{ $branch->name }}</p>
+                        <div class="mt-2 space-y-1 text-sm">
+                            <p><span class="text-base-content/60">Codigo:</span> {{ $branch->code }}</p>
+                            <p><span class="text-base-content/60">Telefono:</span> {{ $branch->phone ?: '-' }}</p>
+                            <p><span class="text-base-content/60">Direccion:</span> {{ $branch->address ?: '-' }}</p>
+                        </div>
+                        <div class="mt-3">
+                            <a href="{{ route('branches.edit', $branch) }}" class="btn btn-outline btn-xs">Editar</a>
+                        </div>
+                    </article>
+                @empty
+                    <div class="rounded-2xl border border-base-300 bg-base-100 p-5 text-center text-sm text-base-content/60">Sin sucursales registradas.</div>
+                @endforelse
+            </div>
+
+            <div class="overflow-x-auto hidden md:block">
                 <table class="table">
                     <thead>
                         <tr>

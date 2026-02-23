@@ -153,7 +153,32 @@
         <div class="row g-4">
             <div class="col-xl-8">
                 <div class="cart-shell">
-                    <div class="table-responsive">
+                    <div class="d-md-none p-3">
+                        @foreach ($cartItems as $item)
+                            <article class="border rounded-3 p-3 mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img src="{{ $item['product']->image_url ?: asset('images/product-placeholder.svg') }}" alt="{{ $item['product']->name }}" class="cart-product-image">
+                                    <div class="fw-semibold">{{ $item['product']->name }}</div>
+                                </div>
+                                <div class="small mt-2">Precio: ${{ number_format($item['unit_price'], 2) }}</div>
+                                <div class="small">Impuesto: ${{ number_format($item['tax'], 2) }}</div>
+                                <div class="small">Total: ${{ number_format($item['total'], 2) }}</div>
+                                <form method="POST" action="{{ route('shop.cart.update', $item['product']) }}" class="mt-2 d-grid gap-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="number" name="quantity" min="1" max="999" value="{{ $item['quantity'] }}" class="form-control form-control-sm">
+                                    <button class="btn btn-outline-secondary btn-sm">Actualizar cantidad</button>
+                                </form>
+                                <form method="POST" action="{{ route('shop.cart.remove', $item['product']) }}" class="mt-2">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn btn-outline-danger btn-sm w-100">Quitar</button>
+                                </form>
+                            </article>
+                        @endforeach
+                    </div>
+
+                    <div class="table-responsive d-none d-md-block">
                         <table class="table align-middle mb-0">
                             <thead class="table-light">
                                 <tr>

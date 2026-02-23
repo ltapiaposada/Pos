@@ -63,7 +63,24 @@
     <div class="mt-6 panel">
         <div class="panel-body">
             <h2 class="text-base font-semibold mb-3">Ultimos cierres</h2>
-            <div class="overflow-x-auto">
+            <div class="space-y-3 md:hidden">
+                @forelse($closures as $closure)
+                    <article class="surface-muted rounded-2xl p-4">
+                        <p class="text-sm font-semibold">{{ $closure->from_date->format('Y-m-d') }} a {{ $closure->to_date->format('Y-m-d') }}</p>
+                        <p class="text-xs text-base-content/60">Fecha asiento: {{ $closure->entry_date->format('Y-m-d') }}</p>
+                        <div class="mt-2 flex items-center justify-between text-sm">
+                            <span>Utilidad neta</span>
+                            <span class="font-semibold">{{ number_format($closure->net_income, 2) }}</span>
+                        </div>
+                        <p class="mt-1 text-xs text-base-content/60">Usuario: {{ $closure->user->name }}</p>
+                        <a href="{{ route('accounting.entries.show', $closure->journalEntry) }}" class="btn btn-outline btn-xs mt-3">Ver asiento</a>
+                    </article>
+                @empty
+                    <div class="rounded-2xl border border-base-300 bg-base-100 p-5 text-center text-sm text-base-content/60">Aun no hay cierres registrados.</div>
+                @endforelse
+            </div>
+
+            <div class="overflow-x-auto hidden md:block">
                 <table class="table">
                     <thead>
                         <tr>

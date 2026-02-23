@@ -34,7 +34,21 @@
             <div class="grid gap-4 mt-5 lg:grid-cols-2">
                 <div class="overflow-x-auto">
                     <h2 class="text-sm font-semibold mb-2">Ingresos</h2>
-                    <table class="table">
+                    <div class="space-y-2 md:hidden">
+                        @forelse ($incomeRows as $row)
+                            <article class="surface-muted rounded-xl p-3">
+                                <p class="text-sm">{{ $row['account']->code }} - {{ $row['account']->name }}</p>
+                                <p class="text-sm font-semibold mt-1">{{ number_format($row['balance'], 2) }}</p>
+                            </article>
+                        @empty
+                            <p class="text-sm text-base-content/60">Sin ingresos para el periodo.</p>
+                        @endforelse
+                        <article class="rounded-xl border border-base-300 bg-base-100 p-3">
+                            <p class="text-xs text-base-content/60">Total ingresos</p>
+                            <p class="font-semibold">{{ number_format($totalIncome, 2) }}</p>
+                        </article>
+                    </div>
+                    <table class="table hidden md:table">
                         <thead>
                             <tr>
                                 <th>Cuenta</th>
@@ -64,7 +78,21 @@
 
                 <div class="overflow-x-auto">
                     <h2 class="text-sm font-semibold mb-2">Gastos</h2>
-                    <table class="table">
+                    <div class="space-y-2 md:hidden">
+                        @forelse ($expenseRows as $row)
+                            <article class="surface-muted rounded-xl p-3">
+                                <p class="text-sm">{{ $row['account']->code }} - {{ $row['account']->name }}</p>
+                                <p class="text-sm font-semibold mt-1">{{ number_format($row['balance'], 2) }}</p>
+                            </article>
+                        @empty
+                            <p class="text-sm text-base-content/60">Sin gastos para el periodo.</p>
+                        @endforelse
+                        <article class="rounded-xl border border-base-300 bg-base-100 p-3">
+                            <p class="text-xs text-base-content/60">Total gastos</p>
+                            <p class="font-semibold">{{ number_format($totalExpense, 2) }}</p>
+                        </article>
+                    </div>
+                    <table class="table hidden md:table">
                         <thead>
                             <tr>
                                 <th>Cuenta</th>

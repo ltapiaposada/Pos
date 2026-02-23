@@ -25,7 +25,44 @@
 
     <div class="mt-6 panel">
         <div class="panel-body">
-            <div class="overflow-x-auto">
+            <div class="space-y-3 md:hidden">
+                @forelse ($customers as $customer)
+                    @php
+                        $typeLabel = $customer->contact_type === 'person'
+                            ? 'Persona'
+                            : ($customer->contact_type === 'company' ? 'Empresa' : 'Proveedor');
+                    @endphp
+                    <article class="surface-muted rounded-2xl p-4">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <p class="text-sm font-semibold">{{ $customer->name }}</p>
+                                <p class="text-xs text-base-content/60">{{ $customer->document ?? '-' }}</p>
+                            </div>
+                            <span class="badge badge-info badge-sm">{{ $typeLabel }}</span>
+                        </div>
+                        <div class="mt-2 text-sm">
+                            <p><span class="text-base-content/60">Email:</span> {{ $customer->email ?? '-' }}</p>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between">
+                            <span class="badge {{ $customer->is_active ? 'badge-success' : 'badge-danger' }}">
+                                {{ $customer->is_active ? 'Si' : 'No' }}
+                            </span>
+                            <div class="actions">
+                                <a href="{{ route('customers.edit', $customer) }}" class="btn btn-outline-primary btn-xs">Editar</a>
+                                <form action="{{ route('customers.destroy', $customer) }}" method="POST" class="inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn btn-outline-danger btn-xs" data-confirm="Eliminar contacto?">Eliminar</button>
+                                </form>
+                            </div>
+                        </div>
+                    </article>
+                @empty
+                    <div class="rounded-2xl border border-base-300 bg-base-100 p-5 text-center text-sm text-base-content/60">Sin registros</div>
+                @endforelse
+            </div>
+
+            <div class="overflow-x-auto hidden md:block">
                 <table class="table">
                     <thead>
                         <tr>

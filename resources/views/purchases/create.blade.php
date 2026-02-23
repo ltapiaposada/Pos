@@ -25,14 +25,14 @@
             <div class="panel">
                 <div class="panel-body">
                     <h2 class="text-sm font-semibold">Items de compra</h2>
-                    <div class="mt-3 flex gap-2">
+                    <div class="mt-3 flex flex-col gap-2 sm:flex-row">
                         <select x-model.number="selectedProductId" class="select select-bordered w-full">
                             <option value="">Selecciona un producto</option>
                             <template x-for="product in products" :key="product.id">
                                 <option :value="product.id" x-text="`${product.name} (${product.sku})`"></option>
                             </template>
                         </select>
-                        <button type="button" class="btn btn-outline" @click="addSelectedProduct">Agregar</button>
+                        <button type="button" class="btn btn-outline w-full sm:w-auto" @click="addSelectedProduct">Agregar</button>
                     </div>
 
                     <template x-if="items.length === 0">
@@ -41,26 +41,30 @@
 
                     <template x-for="(item, index) in items" :key="item.product_id">
                         <div class="surface-muted mt-3 p-3">
-                            <div class="flex items-center justify-between">
+                            <div class="flex items-start justify-between gap-2">
                                 <div>
                                     <div class="text-sm font-semibold" x-text="item.name"></div>
                                     <div class="text-xs text-base-content/60" x-text="item.sku"></div>
                                 </div>
                                 <button type="button" class="btn btn-danger btn-xs" @click="removeItem(index)">Quitar</button>
                             </div>
-                            <div class="mt-2 grid grid-cols-3 gap-2 text-xs">
+                            <div class="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                                 <div>
                                     <label class="text-base-content/60">Cantidad</label>
-                                    <input type="number" min="0.001" step="0.001" x-model.number="item.quantity" class="input input-bordered input-xs w-full">
+                                    <input type="number" min="0.001" step="0.001" x-model.number="item.quantity" class="input input-bordered input-sm sm:input-xs w-full">
                                 </div>
                                 <div>
                                     <label class="text-base-content/60">Costo unitario</label>
-                                    <input type="number" min="0" step="0.01" x-model.number="item.unit_cost" class="input input-bordered input-xs w-full">
+                                    <input type="number" min="0" step="0.01" x-model.number="item.unit_cost" class="input input-bordered input-sm sm:input-xs w-full">
                                 </div>
                                 <div>
                                     <label class="text-base-content/60">Imp %</label>
-                                    <input type="number" min="0" step="0.01" x-model.number="item.tax_rate" class="input input-bordered input-xs w-full">
+                                    <input type="number" min="0" step="0.01" x-model.number="item.tax_rate" class="input input-bordered input-sm sm:input-xs w-full">
                                 </div>
+                            </div>
+                            <div class="mt-2 flex items-center justify-between text-xs">
+                                <span class="text-base-content/60">Subtotal item</span>
+                                <span class="font-semibold" x-text="`$${(toAmount(item.quantity) * toAmount(item.unit_cost)).toFixed(2)}`"></span>
                             </div>
                         </div>
                     </template>

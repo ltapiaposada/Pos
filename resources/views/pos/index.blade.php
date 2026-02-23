@@ -87,11 +87,36 @@
                             placeholder="Buscar producto (Ctrl+K)"
                             class="input input-bordered h-10 w-full min-w-0 flex-1"
                         >
-                        <button @click="fetchProducts" type="button" class="btn btn-outline h-10 px-5 sm:w-auto">Buscar</button>
+                        <button @click="fetchProducts" type="button" class="btn btn-outline h-10 px-5 sm:w-auto">
+                            Buscar
+                        </button>
+                </div>
+                <div class="mt-2 grid grid-cols-2 gap-2 xl:hidden">
+                    <button
+                        type="button"
+                        class="btn h-10 min-w-0 px-2 sm:px-3"
+                        :class="mobileSection === 'products' ? 'btn-primary' : 'btn-outline'"
+                        @click="mobileSection = 'products'"
+                    >
+                        <i class="fa-solid fa-box-open shrink-0" aria-hidden="true"></i>
+                        <span class="min-w-0 truncate">Productos</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="btn h-10 min-w-0 px-2 sm:px-3"
+                        :class="mobileSection === 'cart' ? 'btn-primary' : 'btn-outline'"
+                        @click="mobileSection = 'cart'"
+                    >
+                        <i class="fa-solid fa-cart-shopping shrink-0" aria-hidden="true"></i>
+                        <span class="min-w-0 truncate">Carrito</span>
+                        <span class="inline-flex shrink-0 min-w-[1.35rem] items-center justify-center rounded-full bg-base-content/15 px-1.5 py-0.5 text-[11px] font-semibold leading-none">
+                            <span x-text="cartItemsCount"></span>
+                        </span>
+                    </button>
                 </div>
             </div>
 
-            <div class="panel">
+            <div class="panel" x-show="mobileSection === 'products' || !isMobileViewport" x-cloak>
                 <div class="panel-body">
                     <div class="mb-3 flex items-center justify-between xl:hidden">
                         <h2 class="text-sm font-semibold">Productos</h2>
@@ -99,10 +124,12 @@
                             type="button"
                             @click="showProducts = !showProducts"
                             class="btn btn-outline btn-xs"
-                            x-text="showProducts ? 'Ocultar' : 'Mostrar'"
-                        ></button>
+                        >
+                            <i class="fa-solid fa-layer-group mr-1" aria-hidden="true"></i>
+                            <span x-text="showProducts ? 'Ocultar' : 'Mostrar'"></span>
+                        </button>
                     </div>
-                    <div x-show="showProducts" x-cloak class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                    <div x-show="showProducts" x-cloak class="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                         <template x-for="product in products" :key="product.id">
                             <button type="button" @click="addToCart(product)" class="card h-full border border-base-200 hover:border-primary/60 transition">
                                 <div class="card-body p-4 text-left">
@@ -117,10 +144,19 @@
             </div>
         </div>
 
-        <div class="space-y-4 xl:col-span-5 xl:sticky xl:top-4 self-start">
+        <div class="space-y-4 xl:col-span-5 xl:sticky xl:top-4 self-start" x-show="mobileSection === 'cart' || !isMobileViewport" x-cloak>
             <div class="panel">
                 <div class="panel-body">
-                    <h2 class="text-sm font-semibold">Carrito</h2>
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-sm font-semibold">Carrito</h2>
+                        <button
+                            type="button"
+                            class="btn btn-outline btn-xs xl:hidden"
+                            @click="mobileSection = 'products'"
+                        >
+                            <i class="fa-solid fa-arrow-left mr-1" aria-hidden="true"></i>Seguir agregando
+                        </button>
+                    </div>
                     <template x-if="cart.length === 0">
                         <p class="mt-3 text-sm text-base-content/60">Sin productos.</p>
                     </template>
@@ -131,7 +167,9 @@
                                     <div class="text-sm font-semibold" x-text="item.name"></div>
                                     <div class="text-xs text-base-content/60" x-text="item.sku"></div>
                                 </div>
-                                <button type="button" @click="removeItem(index)" class="btn btn-danger btn-xs">Quitar</button>
+                                <button type="button" @click="removeItem(index)" class="btn btn-danger btn-xs">
+                                    <i class="fa-solid fa-trash-can mr-1" aria-hidden="true"></i>Quitar
+                                </button>
                             </div>
                             <div class="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                                 <div>
@@ -225,12 +263,29 @@
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary mt-4 h-11 w-full" :disabled="requiresCashSession || isSubmitting">
-                        <span x-show="!isSubmitting">Cobrar</span>
-                        <span x-show="isSubmitting" x-cloak>Procesando...</span>
+                        <span x-show="!isSubmitting">
+                            <i class="fa-solid fa-cash-register mr-2" aria-hidden="true"></i>Cobrar
+                        </span>
+                        <span x-show="isSubmitting" x-cloak>
+                            <i class="fa-solid fa-spinner fa-spin mr-2" aria-hidden="true"></i>Procesando...
+                        </span>
                     </button>
                 </div>
             </form>
         </div>
+        <button
+            type="button"
+            class="btn btn-primary fixed bottom-4 right-4 z-40 h-12 px-4 xl:hidden"
+            x-show="isMobileViewport && mobileSection === 'products'"
+            x-cloak
+            @click="mobileSection = 'cart'"
+        >
+            <i class="fa-solid fa-cart-shopping mr-2" aria-hidden="true"></i>
+            Ver carrito
+            <span class="ml-2 inline-flex min-w-[1.35rem] items-center justify-center rounded-full bg-base-content/15 px-1.5 py-0.5 text-[11px] font-semibold leading-none">
+                <span x-text="cartItemsCount"></span>
+            </span>
+        </button>
 
     <div
         x-show="showCashModal"
@@ -264,8 +319,12 @@
                     <input name="opening_amount" type="number" min="0" step="0.01" class="input input-bordered w-full" value="0" required>
                 </div>
                 <div class="flex flex-col gap-2 sm:flex-row">
-                    <button type="submit" class="btn btn-primary flex-1">Abrir caja</button>
-                    <a href="{{ route('cash-register.index') }}" class="btn btn-outline">Ir a Caja</a>
+                    <button type="submit" class="btn btn-primary flex-1">
+                        <i class="fa-solid fa-lock-open mr-2" aria-hidden="true"></i>Abrir caja
+                    </button>
+                    <a href="{{ route('cash-register.index') }}" class="btn btn-outline">
+                        <i class="fa-solid fa-vault mr-2" aria-hidden="true"></i>Ir a Caja
+                    </a>
                 </div>
             </form>
         </div>
@@ -287,6 +346,8 @@
                 filteredCustomers: [],
                 showCustomerDropdown: false,
                 showProducts: true,
+                mobileSection: 'products',
+                isMobileViewport: window.innerWidth < 1280,
                 minCustomerChars: 1,
                 search: '',
                 products: [],
@@ -307,6 +368,9 @@
                         const quantity = this.toAmount(item.quantity);
                         return sum + (unitPrice * quantity);
                     }, 0);
+                },
+                get cartItemsCount() {
+                    return this.cart.length;
                 },
                 get lineDiscountTotal() {
                     return this.cart.reduce((sum, item) => {
@@ -384,6 +448,16 @@
                     this.fetchProducts();
                     this.openBranchId = this.branchId;
                     this.showCashModal = this.requiresCashSession;
+                    const mediaQuery = window.matchMedia('(min-width: 1280px)');
+                    const syncViewportState = (event) => {
+                        this.isMobileViewport = !event.matches;
+                        if (!this.isMobileViewport) {
+                            this.mobileSection = 'products';
+                            this.showProducts = true;
+                        }
+                    };
+                    syncViewportState(mediaQuery);
+                    mediaQuery.addEventListener('change', syncViewportState);
                     window.addEventListener('message', (event) => {
                         if (event.origin !== window.location.origin) {
                             return;

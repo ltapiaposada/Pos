@@ -15,7 +15,39 @@
 
     <div class="mt-6 panel">
         <div class="panel-body">
-            <div class="overflow-x-auto">
+            <div class="space-y-3 md:hidden">
+                @forelse ($lines as $line)
+                    <article class="surface-muted rounded-2xl p-4">
+                        <p class="text-xs text-base-content/60">{{ optional($line->journalEntry?->entry_date)->format('Y-m-d') ?? '-' }}</p>
+                        <p class="mt-1 text-sm font-semibold">
+                            @if ($line->journalEntry)
+                                <a href="{{ route('accounting.entries.show', $line->journalEntry) }}" class="link link-primary">
+                                    {{ $line->journalEntry->entry_number }}
+                                </a>
+                            @else
+                                -
+                            @endif
+                        </p>
+                        <p class="mt-2 text-sm">{{ $line->account?->code }} - {{ $line->account?->name }}</p>
+                        <p class="text-xs text-base-content/60">{{ $line->description ?: ($line->journalEntry?->description ?? '-') }}</p>
+                        <p class="mt-1 text-xs text-base-content/60">Usuario: {{ $line->journalEntry?->user?->name ?? '-' }}</p>
+                        <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
+                            <div class="rounded-xl border border-base-300 bg-base-100 px-3 py-2">
+                                <p class="text-xs text-base-content/60">Debe</p>
+                                <p class="font-semibold">{{ number_format((float) $line->debit, 2) }}</p>
+                            </div>
+                            <div class="rounded-xl border border-base-300 bg-base-100 px-3 py-2">
+                                <p class="text-xs text-base-content/60">Haber</p>
+                                <p class="font-semibold">{{ number_format((float) $line->credit, 2) }}</p>
+                            </div>
+                        </div>
+                    </article>
+                @empty
+                    <div class="rounded-2xl border border-base-300 bg-base-100 p-5 text-center text-sm text-base-content/60">Sin movimientos contables registrados.</div>
+                @endforelse
+            </div>
+
+            <div class="overflow-x-auto hidden md:block">
                 <table class="table">
                     <thead>
                         <tr>

@@ -23,10 +23,45 @@
                         <option value="{{ $branch->id }}" @selected((string) request('branch_id') === (string) $branch->id)>{{ $branch->name }}</option>
                     @endforeach
                 </select>
-                <button class="btn btn-outline w-full md:w-auto">Filtrar</button>
+                <div class="flex gap-2">
+                    <button class="btn btn-primary w-full md:w-auto">Filtrar</button>
+                    <a href="{{ route('purchases.index') }}" class="btn btn-outline w-full md:w-auto">Limpiar</a>
+                </div>
             </form>
 
-            <div class="overflow-x-auto mt-4">
+            <div class="mt-4 space-y-3 md:hidden">
+                @forelse ($purchases as $purchase)
+                    <article class="surface-muted rounded-2xl p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-semibold">{{ $purchase->purchase_number }}</p>
+                                <p class="text-xs text-base-content/60">{{ $purchase->purchased_at->format('Y-m-d H:i') }}</p>
+                            </div>
+                            <a href="{{ route('purchases.show', $purchase) }}" class="btn btn-outline btn-xs">Ver</a>
+                        </div>
+                        <div class="mt-3 space-y-1 text-sm">
+                            <p><span class="text-base-content/60">Proveedor:</span> {{ $purchase->supplier_name }}</p>
+                            <p><span class="text-base-content/60">Sucursal:</span> {{ $purchase->branch->name }}</p>
+                        </div>
+                        <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
+                            <div class="rounded-xl border border-base-300 bg-base-100 px-3 py-2">
+                                <p class="text-xs text-base-content/60">Total</p>
+                                <p class="font-semibold">${{ number_format($purchase->total, 2) }}</p>
+                            </div>
+                            <div class="rounded-xl border border-base-300 bg-base-100 px-3 py-2">
+                                <p class="text-xs text-base-content/60">Saldo</p>
+                                <p class="font-semibold">${{ number_format($purchase->balance_total, 2) }}</p>
+                            </div>
+                        </div>
+                    </article>
+                @empty
+                    <div class="rounded-2xl border border-base-300 bg-base-100 p-5 text-center text-sm text-base-content/60">
+                        Sin compras registradas.
+                    </div>
+                @endforelse
+            </div>
+
+            <div class="overflow-x-auto mt-4 hidden md:block">
                 <table class="table">
                     <thead>
                         <tr>

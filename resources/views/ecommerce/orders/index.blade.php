@@ -60,7 +60,27 @@
         <a href="{{ route('shop.index') }}" class="btn btn-primary">Ir a comprar</a>
     @else
         <div class="orders-shell">
-            <div class="table-responsive">
+            <div class="d-md-none p-3">
+                @foreach ($orders as $order)
+                    <article class="border rounded-3 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <div class="fw-semibold">#{{ $order->sale_number }}</div>
+                                <div class="small text-muted">{{ $order->sold_at?->format('d/m/Y H:i') }}</div>
+                            </div>
+                            <span class="badge {{ $statusClasses[$order->status] ?? 'text-bg-secondary' }}">{{ $statusLabels[$order->status] ?? strtoupper($order->status) }}</span>
+                        </div>
+                        <div class="small mt-2">Pago: {{ $paymentLabels[$order->payments->first()?->method ?? ''] ?? 'Sin registrar' }}</div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <span>Total</span>
+                            <strong>${{ number_format((float) $order->total, 2) }}</strong>
+                        </div>
+                        <a href="{{ route('shop.orders.show', $order) }}" class="btn btn-outline-secondary btn-sm w-100 mt-3">Ver detalle</a>
+                    </article>
+                @endforeach
+            </div>
+
+            <div class="table-responsive d-none d-md-block">
                 <table class="table align-middle mb-0">
                     <thead class="table-light">
                         <tr>

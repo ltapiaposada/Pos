@@ -39,7 +39,19 @@
             <span class="chip">Ultimos movimientos</span>
         </div>
         <div class="panel-body">
-            <div class="overflow-x-auto">
+            <div class="space-y-3 md:hidden">
+                @forelse ($recentSales as $sale)
+                    <article class="surface-muted rounded-2xl p-4">
+                        <p class="text-sm font-semibold">#{{ $sale->sale_number }}</p>
+                        <p class="text-xs text-base-content/60">{{ $sale->sold_at->format('d/m/Y H:i') }}</p>
+                        <p class="mt-2 text-sm font-semibold">${{ number_format($sale->total, 2) }}</p>
+                    </article>
+                @empty
+                    <div class="rounded-2xl border border-base-300 bg-base-100 p-5 text-center text-sm text-base-content/60">Sin ventas aun.</div>
+                @endforelse
+            </div>
+
+            <div class="overflow-x-auto hidden md:block">
                 <table class="table table-sm">
                     <thead>
                         <tr>
