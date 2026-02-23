@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500">
+  <defs>
+    <style>
+      .box { fill: #ffffff; stroke: #334155; stroke-width: 2; rx: 12; ry: 12; }
+      .title { font: 700 20px Arial, sans-serif; fill: #0f172a; }
+      .txt { font: 14px Arial, sans-serif; fill: #1f2937; }
+      .arrow { stroke: #0ea5e9; stroke-width: 3; fill: none; marker-end: url(#a); }
+    </style>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#0ea5e9" />
+    </marker>
+  </defs>
+
+  <text x="30" y="40" class="title">Flujo operativo y contable de una venta</text>
+
+  <rect class="box" x="30" y="90" width="220" height="95" />
+  <text x="50" y="123" class="txt">Caja abierta validada</text>
+  <text x="50" y="148" class="txt">(usuario + sucursal)</text>
+
+  <rect class="box" x="290" y="90" width="220" height="95" />
+  <text x="310" y="123" class="txt">POS checkout</text>
+  <text x="310" y="148" class="txt">items + pagos</text>
+
+  <rect class="box" x="550" y="90" width="220" height="95" />
+  <text x="570" y="123" class="txt">Crear venta y detalle</text>
+  <text x="570" y="148" class="txt">sales + sale_items</text>
+
+  <rect class="box" x="810" y="90" width="220" height="95" />
+  <text x="830" y="123" class="txt">Actualizar inventario</text>
+  <text x="830" y="148" class="txt">(incluye kits)</text>
+
+  <rect class="box" x="970" y="290" width="200" height="95" />
+  <text x="990" y="323" class="txt">Registrar pago caja</text>
+  <text x="990" y="348" class="txt">cash movement IN</text>
+
+  <rect class="box" x="550" y="290" width="260" height="95" />
+  <text x="570" y="323" class="txt">Contabilización automática</text>
+  <text x="570" y="348" class="txt">journal_entries + lines</text>
+
+  <rect class="box" x="250" y="290" width="260" height="95" />
+  <text x="270" y="323" class="txt">Factura y ticket</text>
+  <text x="270" y="348" class="txt">/sales y /sales/{id}/ticket</text>
+
+  <path class="arrow" d="M250,137 L290,137" />
+  <path class="arrow" d="M510,137 L550,137" />
+  <path class="arrow" d="M770,137 L810,137" />
+  <path class="arrow" d="M920,185 L920,250 L810,250 L810,290" />
+  <path class="arrow" d="M680,185 L680,290" />
+  <path class="arrow" d="M550,337 L510,337" />
+</svg>

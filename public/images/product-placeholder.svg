@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Imagen no disponible">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" rx="42" fill="url(#bg)"/>
+  <rect x="44" y="44" width="712" height="712" rx="30" fill="#f8fafc" stroke="#94a3b8" stroke-dasharray="8 8"/>
+  <circle cx="400" cy="320" r="88" fill="url(#badge)"/>
+  <path d="M400 268l44 36v66h-88v-66l44-36z" fill="#e2e8f0"/>
+  <rect x="378" y="320" width="44" height="48" rx="5" fill="#94a3b8"/>
+  <text x="400" y="500" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#475569">IMAGEN NO DISPONIBLE</text>
+  <text x="400" y="555" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f172a">SIN FOTO</text>
+</svg>
