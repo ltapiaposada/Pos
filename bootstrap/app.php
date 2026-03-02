@@ -3,6 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -26,5 +28,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->respond(function ($response, \Throwable $exception, Request $request) {
+            if ($response->getStatusCode() === 419 && ! $request->expectsJson()) {
+                $target = Route::has('login') ? route('login') : url('/');
+
+                return redirect()->guest($target)
+                    ->with('status', 'Tu sesion expiro. Inicia sesion nuevamente.');
+            }
+
+            return $response;
+        });
     })->create();

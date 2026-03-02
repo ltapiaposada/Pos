@@ -251,13 +251,23 @@
             const type = typeSelect.value;
             variantFields.classList.toggle('hidden', type !== '{{ \App\Models\Product::TYPE_VARIANT }}');
             kitFields.classList.toggle('hidden', type !== '{{ \App\Models\Product::TYPE_KIT }}');
+            updateInputNames();
         }
 
         function updateInputNames() {
+            const isKit = typeSelect.value === '{{ \App\Models\Product::TYPE_KIT }}';
             const rows = wrapper.querySelectorAll('.kit-item-row');
             rows.forEach((row, index) => {
-                row.querySelector('.component-input').name = `kit_items[${index}][component_product_id]`;
-                row.querySelector('.quantity-input').name = `kit_items[${index}][quantity]`;
+                const componentInput = row.querySelector('.component-input');
+                const quantityInput = row.querySelector('.quantity-input');
+
+                if (isKit) {
+                    componentInput.name = `kit_items[${index}][component_product_id]`;
+                    quantityInput.name = `kit_items[${index}][quantity]`;
+                } else {
+                    componentInput.name = '';
+                    quantityInput.name = '';
+                }
             });
         }
 
@@ -289,7 +299,7 @@
 
         if (initialItems.length > 0) {
             initialItems.forEach(item => createRow(item));
-        } else {
+        } else if (typeSelect.value === '{{ \App\Models\Product::TYPE_KIT }}') {
             createRow();
         }
 
