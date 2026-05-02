@@ -59,10 +59,17 @@ Al correr `migrate --seed` o `migrate:fresh --seed`, se crean datos base:
 - Cliente por defecto:
   - `Consumidor final` con identificacion `222222222222`.
 
-## Configuracion de logo (Cloudinary)
+## Configuracion de imagenes (Cloudflare R2)
 En `.env`:
-- `CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME`
-- Opcional: `CLOUDINARY_FOLDER=pos`
+- `IMAGE_DISK=r2`
+- `IMAGE_PREFIX=pos`
+- `R2_ACCESS_KEY_ID=...`
+- `R2_SECRET_ACCESS_KEY=...`
+- `R2_BUCKET=...`
+- `R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`
+- `R2_URL=https://<tu-dominio-publico-o-custom-domain>`
+- Opcional: `R2_DEFAULT_REGION=auto`
+- Opcional local Windows: `R2_VERIFY_SSL=false` si tu PHP/cURL no reconoce la CA
 
 ## Operacion basica
 1. Iniciar sesion.

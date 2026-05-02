@@ -98,7 +98,7 @@
                                 margin-top: .4rem;
                             }
                         </style>
-                        <label class="field-label">Subir imagen (Cloudinary)</label>
+                        <label class="field-label">Subir imagen (Cloudflare R2)</label>
                         <input id="image_file" name="image_file" type="file" accept="image/*" class="hidden">
                         <label for="image_file" id="image-upload-card" class="upload-dropzone">
                             <div class="upload-dropzone__icon">
@@ -108,7 +108,7 @@
                             <div class="upload-dropzone__subtitle">Haz clic para subir PNG/JPG/WebP (max. 5MB)</div>
                         </label>
                         <span id="image-file-name" class="upload-file-name ms-2">Ningun archivo seleccionado</span>
-                        <p id="image-file-help" class="text-xs text-base-content/60 mt-1">PNG/JPG/WebP hasta 5MB. Se sube a Cloudinary al guardar.</p>
+                        <p id="image-file-help" class="text-xs text-base-content/60 mt-1">PNG/JPG/WebP hasta 5MB. Se sube a Cloudflare R2 al guardar.</p>
                         @error('image_file')
                             <p class="text-xs text-error mt-1">{{ $message }}</p>
                         @enderror
@@ -323,7 +323,7 @@
             const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
 
             if (!file) {
-                help.textContent = 'PNG/JPG/WebP hasta 5MB. Se sube a Cloudinary al guardar.';
+                help.textContent = 'PNG/JPG/WebP hasta 5MB. Se sube a Cloudflare R2 al guardar.';
                 if (fileName) {
                     fileName.textContent = 'Ningun archivo seleccionado';
                 }

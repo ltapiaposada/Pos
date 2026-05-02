@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
 
 class SettingRequest extends FormRequest
 {
@@ -21,10 +22,43 @@ class SettingRequest extends FormRequest
             'currency' => ['required', 'string', 'max:10'],
             'default_tax_id' => ['nullable', 'integer', 'exists:taxes,id'],
             'allow_negative_stock' => ['nullable', 'boolean'],
-            'logo' => ['nullable', 'image', 'max:2048'],
-            'logo_url' => ['nullable', 'url', 'max:500'],
-            'payment_qr' => ['nullable', 'image', 'max:2048'],
-            'payment_qr_url' => ['nullable', 'url', 'max:500'],
+            'logo' => ['nullable', 'file', 'max:2048'],
+            'logo_url' => ['nullable', 'string', 'max:500'],
+            'payment_qr' => ['nullable', 'file', 'max:2048'],
+            'payment_qr_url' => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'logo.max' => 'Solo se permiten archivos de hasta 2MB.',
+            'logo.uploaded' => 'Solo se permiten archivos de hasta 2MB.',
+            'payment_qr.max' => 'Solo se permiten archivos de hasta 2MB.',
+            'payment_qr.uploaded' => 'Solo se permiten archivos de hasta 2MB.',
+        ];
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        logger()->error('Settings validation failed.', [
+            'errors' => $validator->errors()->toArray(),
+            'has_logo' => $this->hasFile('logo'),
+            'has_payment_qr' => $this->hasFile('payment_qr'),
+            'logo_name' => $this->file('logo')?->getClientOriginalName(),
+            'logo_size' => $this->file('logo')?->getSize(),
+            'logo_error' => $this->file('logo')?->getError(),
+            'logo_error_message' => $this->file('logo')?->getErrorMessage(),
+            'logo_is_valid' => $this->file('logo')?->isValid(),
+            'qr_name' => $this->file('payment_qr')?->getClientOriginalName(),
+            'qr_size' => $this->file('payment_qr')?->getSize(),
+            'qr_error' => $this->file('payment_qr')?->getError(),
+            'qr_error_message' => $this->file('payment_qr')?->getErrorMessage(),
+            'qr_is_valid' => $this->file('payment_qr')?->isValid(),
+            'logo_url' => $this->input('logo_url'),
+            'payment_qr_url' => $this->input('payment_qr_url'),
+        ]);
+
+        parent::failedValidation($validator);
     }
 }

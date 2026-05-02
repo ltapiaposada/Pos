@@ -14,7 +14,15 @@ class LogoUploadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'logo' => ['required', 'image', 'max:5120'],
+            'logo' => ['required', 'file', 'max:2048'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'logo.max' => 'Solo se permiten archivos de hasta 2MB.',
+            'logo.uploaded' => 'Solo se permiten archivos de hasta 2MB.',
         ];
     }
 }

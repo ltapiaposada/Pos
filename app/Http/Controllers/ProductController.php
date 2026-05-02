@@ -6,7 +6,7 @@ use App\Http\Requests\ProductRequest;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Tax;
-use App\Services\CloudinaryService;
+use App\Services\ImageStorageService;
 use App\Support\StorefrontCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -46,7 +46,7 @@ class ProductController extends Controller
         return view('products.create', compact('categories', 'taxes', 'parentCandidates', 'kitComponentCandidates'));
     }
 
-    public function store(ProductRequest $request, CloudinaryService $cloudinary)
+    public function store(ProductRequest $request, ImageStorageService $imageStorage)
     {
         $payload = $request->validated();
         $kitItems = collect($payload['kit_items'] ?? []);
@@ -59,11 +59,11 @@ class ProductController extends Controller
 
         if ($request->hasFile('image_file')) {
             try {
-                $payload['image_url'] = $cloudinary->uploadImage($request->file('image_file'));
+                $payload['image_url'] = $imageStorage->uploadImage($request->file('image_file'));
             } catch (\Throwable $e) {
                 report($e);
                 return back()
-                    ->withErrors(['image_file' => config('app.debug') ? $e->getMessage() : 'No se pudo subir la imagen a Cloudinary.'])
+                    ->withErrors(['image_file' => config('app.debug') ? $e->getMessage() : 'No se pudo subir la imagen a Cloudflare R2.'])
                     ->withInput();
             }
         }
@@ -96,7 +96,7 @@ class ProductController extends Controller
         return view('products.edit', compact('product', 'categories', 'taxes', 'parentCandidates', 'kitComponentCandidates'));
     }
 
-    public function update(ProductRequest $request, Product $product, CloudinaryService $cloudinary)
+    public function update(ProductRequest $request, Product $product, ImageStorageService $imageStorage)
     {
         $payload = $request->validated();
         $kitItems = collect($payload['kit_items'] ?? []);
@@ -109,11 +109,11 @@ class ProductController extends Controller
 
         if ($request->hasFile('image_file')) {
             try {
-                $payload['image_url'] = $cloudinary->uploadImage($request->file('image_file'));
+                $payload['image_url'] = $imageStorage->uploadImage($request->file('image_file'));
             } catch (\Throwable $e) {
                 report($e);
                 return back()
-                    ->withErrors(['image_file' => config('app.debug') ? $e->getMessage() : 'No se pudo subir la imagen a Cloudinary.'])
+                    ->withErrors(['image_file' => config('app.debug') ? $e->getMessage() : 'No se pudo subir la imagen a Cloudflare R2.'])
                     ->withInput();
             }
         }

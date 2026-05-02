@@ -34,9 +34,6 @@
                                 </div>
                             </div>
                             <div class="mt-3 flex items-center justify-center gap-2">
-                                <button type="button" class="btn btn-primary btn-sm" id="upload-logo">
-                                    Subir logo
-                                </button>
                                 <span class="text-xs text-base-content/60" id="upload-status"></span>
                             </div>
                         </div>
@@ -58,7 +55,6 @@
                                 @error('logo_url')
                                     <p class="text-xs text-error mt-1">{{ $message }}</p>
                                 @enderror
-                                <p class="mt-1 text-xs text-base-content/60">Sube primero y luego guarda para registrar la URL.</p>
                             </div>
                         </div>
                     </div>
@@ -80,9 +76,6 @@
                                 >
                             </div>
                             <div class="mt-3 flex items-center justify-center gap-2">
-                                <button type="button" class="btn btn-primary btn-sm" id="upload-qr">
-                                    Subir QR
-                                </button>
                                 <span class="text-xs text-base-content/60" id="qr-upload-status"></span>
                             </div>
                         </div>
@@ -104,7 +97,6 @@
                                 @error('payment_qr_url')
                                     <p class="text-xs text-error mt-1">{{ $message }}</p>
                                 @enderror
-                                <p class="mt-1 text-xs text-base-content/60">Sube primero y luego guarda para registrar la URL.</p>
                             </div>
                         </div>
                     </div>
@@ -165,13 +157,11 @@
             const logoPreview = document.getElementById('logo-preview');
             const clearBtn = document.getElementById('clear-logo');
             const logoUrlInput = document.querySelector('input[name="logo_url"]');
-            const uploadBtn = document.getElementById('upload-logo');
             const statusEl = document.getElementById('upload-status');
             const qrInput = document.getElementById('qr-input');
             const qrPreview = document.getElementById('qr-preview');
             const clearQrBtn = document.getElementById('clear-qr');
             const qrUrlInput = document.querySelector('input[name="payment_qr_url"]');
-            const uploadQrBtn = document.getElementById('upload-qr');
             const qrStatusEl = document.getElementById('qr-upload-status');
             const companyNameInput = document.querySelector('input[name=\"name\"]');
             const companyNamePreview = document.getElementById('company-name-preview');
@@ -194,6 +184,17 @@
                         preview.alt = altText;
                     };
                     reader.readAsDataURL(file);
+                });
+            }
+
+            function bindSelectionStatus(input, statusNode, readyLabel) {
+                if (!input || !statusNode) {
+                    return;
+                }
+
+                input.addEventListener('change', function () {
+                    const file = input.files && input.files[0];
+                    statusNode.textContent = file ? readyLabel : '';
                 });
             }
 
@@ -224,68 +225,16 @@
                 });
             }
 
-            async function bindUpload(button, fileInput, urlInput, preview, statusNode, fieldName, endpoint, successLabel, altText) {
-                if (!button || !fileInput || !urlInput || !preview || !statusNode) {
-                    return;
-                }
-
-                button.addEventListener('click', async function () {
-                    const file = fileInput.files && fileInput.files[0];
-                    if (!file) {
-                        statusNode.textContent = 'Selecciona una imagen primero.';
-                        return;
-                    }
-                    statusNode.textContent = 'Subiendo...';
-                    const formData = new FormData();
-                    formData.append(fieldName, file);
-                    try {
-                        const response = await fetch(endpoint, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'Accept': 'application/json',
-                            },
-                            credentials: 'same-origin',
-                            body: formData,
-                        });
-                        const data = await response.json();
-                        if (!response.ok) {
-                            statusNode.textContent = data.message || 'Error al subir.';
-                            return;
-                        }
-                        urlInput.value = data.url;
-                        preview.src = data.url;
-                        preview.alt = altText;
-                        statusNode.textContent = successLabel;
-                    } catch (e) {
-                        statusNode.textContent = 'Error de red al subir.';
-                    }
-                });
-            }
-
-            bindUpload(
-                uploadBtn,
+            bindSelectionStatus(
                 logoInput,
-                logoUrlInput,
-                logoPreview,
                 statusEl,
-                'logo',
-                '{{ route('settings.logo-upload') }}',
-                'Logo subido.',
-                'Logo'
+                'Logo listo. Presiona Guardar.'
             );
 
-            bindUpload(
-                uploadQrBtn,
+            bindSelectionStatus(
                 qrInput,
-                qrUrlInput,
-                qrPreview,
                 qrStatusEl,
-                'qr',
-                '{{ route('settings.qr-upload') }}',
-                'QR subido.',
-                'QR de pago'
+                'QR listo. Presiona Guardar.'
             );
         })();
     </script>

@@ -29,6 +29,10 @@ Route::get('/carrito', [StorefrontController::class, 'cart'])->name('shop.cart')
 Route::post('/carrito/items', [StorefrontController::class, 'addToCart'])->name('shop.cart.add');
 Route::patch('/carrito/items/{product}', [StorefrontController::class, 'updateCartItem'])->name('shop.cart.update');
 Route::delete('/carrito/items/{product}', [StorefrontController::class, 'removeCartItem'])->name('shop.cart.remove');
+Route::get('/pos/scanner/remote/{token}', [PosController::class, 'remoteScanner'])->name('pos.scanner.remote');
+Route::post('/pos/scanner/remote/{token}/scan', [PosController::class, 'receiveRemoteScan'])
+    ->middleware('throttle:120,1')
+    ->name('pos.scanner.remote.scan');
 
 Route::middleware(['auth', 'customer.user'])->group(function () {
     Route::get('/checkout', [StorefrontController::class, 'checkout'])->name('shop.checkout');
@@ -71,6 +75,9 @@ Route::middleware(['auth', 'admin.user'])->group(function () {
 
     Route::get('pos', [PosController::class, 'index'])->name('pos.index')->middleware('permission:create_sale');
     Route::get('pos/products', [PosController::class, 'products'])->name('pos.products')->middleware('permission:create_sale');
+    Route::get('pos/products/resolve', [PosController::class, 'resolveProduct'])->name('pos.products.resolve')->middleware('permission:create_sale');
+    Route::post('pos/scanner/session', [PosController::class, 'createScannerSession'])->name('pos.scanner.session')->middleware('permission:create_sale');
+    Route::get('pos/scanner/session/{token}/poll', [PosController::class, 'pollScannerSession'])->name('pos.scanner.poll')->middleware('permission:create_sale');
     Route::post('pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout')->middleware('permission:create_sale');
     Route::get('sales', [PosController::class, 'invoices'])->name('sales.index')->middleware('permission:create_sale');
     Route::get('sales/{sale}', [PosController::class, 'show'])->name('sales.show')->middleware('permission:create_sale');

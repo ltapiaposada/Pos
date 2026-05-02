@@ -7,9 +7,11 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "aws/aws-sdk-php": "^3.379",
         "blade-ui-kit/blade-heroicons": "^2.6",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
+        "league/flysystem-aws-s3-v3": "^3.32",
         "spatie/laravel-permission": "^6.24",
         "symfony/http-client": "^7.4",
         "symfony/mailgun-mailer": "^7.4"

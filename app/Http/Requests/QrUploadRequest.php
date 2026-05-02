@@ -14,8 +14,14 @@ class QrUploadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'qr' => ['required', 'image', 'max:5120'],
+            'qr' => ['required', 'file', 'max:2048'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'qr.max' => 'Solo se permiten archivos de hasta 2MB.',
         ];
     }
 }
-

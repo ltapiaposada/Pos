@@ -91,6 +91,15 @@
                             Buscar
                         </button>
                 </div>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <button type="button" class="btn btn-outline btn-sm" @click="startCameraScanner">
+                        <i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>Escanear con camara
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" @click="openRemoteScannerModal">
+                        <i class="fa-solid fa-mobile-screen-button mr-1" aria-hidden="true"></i>Usar celular como lector
+                    </button>
+                    <span class="text-xs text-base-content/60">Lector USB: escanea directamente sobre esta pantalla.</span>
+                </div>
                 <div class="mt-2 grid grid-cols-2 gap-2 xl:hidden">
                     <button
                         type="button"
@@ -288,6 +297,111 @@
         </button>
 
     <div
+        x-show="showCameraModal"
+        x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+        style="display: none;"
+    >
+        <div class="w-full max-w-lg rounded-xl bg-base-100 shadow-xl">
+            <div class="border-b border-base-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold">Escaner con camara</h2>
+                    <p class="text-sm text-base-content/60 mt-1">Escanea desde este dispositivo.</p>
+                </div>
+                <button type="button" class="btn btn-outline btn-xs" @click="closeCameraScanner">Cerrar</button>
+            </div>
+            <div class="p-5 space-y-3">
+                <video
+                    x-ref="cameraPreview"
+                    autoplay
+                    muted
+                    playsinline
+                    class="w-full rounded-xl border border-base-300 bg-base-200 min-h-[200px]"
+                ></video>
+                <p class="text-xs text-base-content/60" x-text="cameraStatus"></p>
+                <div class="flex justify-end">
+                    <button type="button" class="btn btn-outline" @click="closeCameraScanner">Detener</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div
+        x-show="showRemoteScannerModal"
+        x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        style="display: none;"
+    >
+        <div class="w-full max-w-xl rounded-xl bg-base-100 shadow-xl">
+            <div class="border-b border-base-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold">Celular como lector</h2>
+                    <p class="text-sm text-base-content/60 mt-1">Abre este enlace en el celular para escanear y enviar al POS.</p>
+                </div>
+                <button type="button" class="btn btn-outline btn-xs" @click="showRemoteScannerModal = false">Cerrar</button>
+            </div>
+            <div class="p-5 space-y-3">
+                <div>
+                    <label class="field-label">URL local actual</label>
+                    <input type="text" class="input input-bordered w-full text-xs" :value="remoteScannerUrl || 'Generando enlace...'" readonly>
+                </div>
+                <div class="grid gap-2 sm:grid-cols-3">
+                    <div>
+                        <label class="field-label">Protocolo</label>
+                        <select class="select select-bordered w-full" x-model="scannerProtocol">
+                            <option value="http://">http://</option>
+                            <option value="https://">https://</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="field-label">IP o host para USB</label>
+                        <input
+                            type="text"
+                            class="input input-bordered w-full text-sm"
+                            x-model.trim="scannerHostInput"
+                            placeholder="Ejemplo: 192.168.42.129"
+                        >
+                    </div>
+                    <div>
+                        <label class="field-label">Puerto</label>
+                        <input type="text" class="input input-bordered w-full text-sm" x-model.trim="scannerPortInput" placeholder="8000">
+                    </div>
+                    <div class="sm:col-span-2 flex items-end">
+                        <button type="button" class="btn btn-outline btn-sm w-full sm:w-auto" @click="useCurrentOriginForScanner">
+                            Usar host actual
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="field-label">URL para celular por USB</label>
+                    <input type="text" class="input input-bordered w-full text-xs" :value="remoteScannerUsbUrl || 'Completa IP/host'" readonly>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline btn-sm" @click="copyRemoteScannerUrl" :disabled="!remoteScannerUrl">
+                        Copiar URL local
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" @click="copyRemoteScannerUsbUrl" :disabled="!remoteScannerUsbUrl">
+                        Copiar URL USB
+                    </button>
+                    <a
+                        class="btn btn-primary btn-sm"
+                        :href="remoteScannerUsbUrl || remoteScannerUrl || '#'"
+                        target="_blank"
+                        rel="noopener"
+                        :class="{ 'pointer-events-none opacity-50': !(remoteScannerUsbUrl || remoteScannerUrl) }"
+                    >
+                        Abrir escaner remoto
+                    </a>
+                </div>
+                <p class="text-xs text-base-content/60">
+                    Para USB: activa Anclaje USB en el celular, ejecuta `php artisan serve --host=0.0.0.0 --port=8000` y usa la IP del adaptador USB de tu PC.
+                </p>
+                <p class="text-xs text-base-content/60" x-show="lastScannerMessage" x-text="lastScannerMessage"></p>
+            </div>
+        </div>
+    </div>
+
+    <div
         x-show="showCashModal"
         x-cloak
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -358,6 +472,23 @@
                 paymentTransfer: Number((oldPosState.payments || []).find(p => p.method === 'transfer')?.amount || 0),
                 paymentCredit: Number((oldPosState.payments || []).find(p => p.method === 'credit')?.amount || 0),
                 isSubmitting: false,
+                scannerKeyboardBuffer: '',
+                scannerKeyboardLastAt: 0,
+                scannerPollingTimer: null,
+                scannerSessionToken: '',
+                remoteScannerUrl: '',
+                scannerProtocol: window.location.protocol === 'https:' ? 'https://' : 'http://',
+                scannerHostInput: window.location.hostname || '',
+                scannerPortInput: window.location.port || '8000',
+                showRemoteScannerModal: false,
+                showCameraModal: false,
+                scannerStream: null,
+                scannerDetector: null,
+                scannerLoopRunning: false,
+                scannerLastCode: '',
+                scannerLastDetectedAt: 0,
+                cameraStatus: 'Camara detenida.',
+                lastScannerMessage: '',
                 toAmount(value) {
                     const number = Number(value);
                     return Number.isFinite(number) ? number : 0;
@@ -427,6 +558,29 @@
                 get changeTotal() {
                     return Math.max(0, this.paidTotal - this.total);
                 },
+                get remoteScannerUsbUrl() {
+                    const token = String(this.scannerSessionToken || '').trim();
+                    if (!token) {
+                        return '';
+                    }
+
+                    let host = String(this.scannerHostInput || '').trim();
+                    host = host
+                        .replace(/^https?:\/\//i, '')
+                        .replace(/\/.*$/, '')
+                        .replace(/:\d+$/, '')
+                        .trim();
+                    if (!host) {
+                        return '';
+                    }
+
+                    let port = String(this.scannerPortInput || '').trim();
+                    port = port.replace(/[^\d]/g, '');
+                    const protocol = this.scannerProtocol === 'https://' ? 'https://' : 'http://';
+                    const portSegment = port ? `:${port}` : '';
+
+                    return `${protocol}${host}${portSegment}/pos/scanner/remote/${token}`;
+                },
                 get itemsPayload() {
                     return JSON.stringify(this.cart.map(item => ({
                         product_id: item.product_id,
@@ -448,6 +602,7 @@
                     this.fetchProducts();
                     this.openBranchId = this.branchId;
                     this.showCashModal = this.requiresCashSession;
+                    this.initKeyboardScanner();
                     const mediaQuery = window.matchMedia('(min-width: 1280px)');
                     const syncViewportState = (event) => {
                         this.isMobileViewport = !event.matches;
@@ -472,6 +627,10 @@
                             this.customerSearch = selected.name;
                         }
                     }
+                    window.addEventListener('beforeunload', () => {
+                        this.stopRemoteScannerPolling();
+                        this.closeCameraScanner();
+                    });
                     this.filterCustomers();
                 },
                 focusSearch() {
@@ -504,6 +663,214 @@
                     this.customerSearch = '';
                     this.filterCustomers();
                     this.showCustomerDropdown = false;
+                },
+                initKeyboardScanner() {
+                    window.addEventListener('keydown', (event) => {
+                        const now = Date.now();
+                        if (event.key === 'Enter') {
+                            const buffer = this.scannerKeyboardBuffer.trim();
+                            const elapsed = now - this.scannerKeyboardLastAt;
+                            if (buffer.length >= 4 && elapsed < 120) {
+                                event.preventDefault();
+                                this.handleScannedBarcode(buffer, 'lector USB');
+                            }
+                            this.scannerKeyboardBuffer = '';
+                            return;
+                        }
+
+                        if (event.key.length !== 1) {
+                            return;
+                        }
+
+                        if ((now - this.scannerKeyboardLastAt) > 80) {
+                            this.scannerKeyboardBuffer = '';
+                        }
+                        this.scannerKeyboardBuffer += event.key;
+                        this.scannerKeyboardLastAt = now;
+                    });
+                },
+                async handleScannedBarcode(rawCode, sourceLabel = 'escaner') {
+                    const barcode = String(rawCode || '').trim();
+                    if (barcode === '') {
+                        return;
+                    }
+                    try {
+                        const response = await fetch(`{{ route('pos.products.resolve') }}?${new URLSearchParams({ barcode }).toString()}`, {
+                            headers: { 'Accept': 'application/json' },
+                        });
+                        if (!response.ok) {
+                            this.lastScannerMessage = `${sourceLabel}: codigo ${barcode} no encontrado.`;
+                            return;
+                        }
+                        const product = await response.json();
+                        this.addToCart(product);
+                        this.lastScannerMessage = `${sourceLabel}: agregado ${product.name}.`;
+                        if (navigator.vibrate) {
+                            navigator.vibrate(50);
+                        }
+                    } catch (error) {
+                        this.lastScannerMessage = `${sourceLabel}: error leyendo codigo.`;
+                    }
+                },
+                async createRemoteScannerSession() {
+                    if (this.scannerSessionToken && this.remoteScannerUrl) {
+                        return;
+                    }
+                    const response = await fetch(`{{ route('pos.scanner.session') }}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': @js(csrf_token()),
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({}),
+                    });
+                    if (!response.ok) {
+                        throw new Error('No fue posible crear sesion de escaneo remoto.');
+                    }
+                    const payload = await response.json();
+                    this.scannerSessionToken = payload.token || '';
+                    this.remoteScannerUrl = payload.remote_url || '';
+                },
+                startRemoteScannerPolling() {
+                    this.stopRemoteScannerPolling();
+                    if (!this.scannerSessionToken) {
+                        return;
+                    }
+                    this.scannerPollingTimer = window.setInterval(async () => {
+                        try {
+                            const response = await fetch(`{{ url('pos/scanner/session') }}/${this.scannerSessionToken}/poll`, {
+                                headers: { 'Accept': 'application/json' },
+                            });
+                            if (!response.ok) {
+                                return;
+                            }
+                            const payload = await response.json();
+                            const events = Array.isArray(payload.events) ? payload.events : [];
+                            for (const event of events) {
+                                await this.handleScannedBarcode(event.barcode, 'celular remoto');
+                            }
+                        } catch (error) {
+                            // Sin accion: en el siguiente ciclo reintenta.
+                        }
+                    }, 1300);
+                },
+                stopRemoteScannerPolling() {
+                    if (this.scannerPollingTimer) {
+                        clearInterval(this.scannerPollingTimer);
+                        this.scannerPollingTimer = null;
+                    }
+                },
+                async openRemoteScannerModal() {
+                    this.showRemoteScannerModal = true;
+                    if (!this.scannerSessionToken) {
+                        try {
+                            await this.createRemoteScannerSession();
+                            this.startRemoteScannerPolling();
+                        } catch (error) {
+                            this.lastScannerMessage = 'No se pudo iniciar el escaner remoto.';
+                        }
+                    }
+                },
+                async copyRemoteScannerUrl() {
+                    if (!this.remoteScannerUrl) {
+                        return;
+                    }
+                    try {
+                        await navigator.clipboard.writeText(this.remoteScannerUrl);
+                        this.lastScannerMessage = 'Enlace copiado al portapapeles.';
+                    } catch (error) {
+                        this.lastScannerMessage = 'No se pudo copiar el enlace.';
+                    }
+                },
+                async copyRemoteScannerUsbUrl() {
+                    if (!this.remoteScannerUsbUrl) {
+                        return;
+                    }
+                    try {
+                        await navigator.clipboard.writeText(this.remoteScannerUsbUrl);
+                        this.lastScannerMessage = 'URL USB copiada al portapapeles.';
+                    } catch (error) {
+                        this.lastScannerMessage = 'No se pudo copiar la URL USB.';
+                    }
+                },
+                useCurrentOriginForScanner() {
+                    this.scannerProtocol = window.location.protocol === 'https:' ? 'https://' : 'http://';
+                    this.scannerHostInput = window.location.hostname || '';
+                    this.scannerPortInput = window.location.port || '';
+                },
+                async startCameraScanner() {
+                    this.showCameraModal = true;
+                    this.cameraStatus = 'Iniciando camara...';
+                    const host = String(window.location.hostname || '').toLowerCase();
+                    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+                    if (!window.isSecureContext && !isLocalhost) {
+                        this.cameraStatus = 'Camara bloqueada por el navegador: usa HTTPS o localhost para habilitarla.';
+                        alert('El navegador bloquea la camara en HTTP para IPs. Usa HTTPS o escaner remoto/manual.');
+                        return;
+                    }
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        this.cameraStatus = 'Este navegador no expone getUserMedia para camara.';
+                        return;
+                    }
+                    if (!('BarcodeDetector' in window)) {
+                        this.cameraStatus = 'Este navegador no soporta lector por camara. Usa lector USB o celular remoto.';
+                        return;
+                    }
+                    try {
+                        this.scannerDetector = new BarcodeDetector({
+                            formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'],
+                        });
+                    } catch (error) {
+                        this.cameraStatus = 'No se pudo iniciar el detector.';
+                        return;
+                    }
+                    try {
+                        this.scannerStream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: { ideal: 'environment' } },
+                            audio: false,
+                        });
+                        this.$refs.cameraPreview.srcObject = this.scannerStream;
+                        this.cameraStatus = 'Camara activa. Apunta al codigo.';
+                        this.scannerLoopRunning = true;
+                        this.cameraScanLoop();
+                    } catch (error) {
+                        this.cameraStatus = 'No se pudo acceder a la camara. Revisa permisos del navegador para este sitio.';
+                    }
+                },
+                async cameraScanLoop() {
+                    if (!this.scannerLoopRunning || !this.scannerDetector || !this.$refs.cameraPreview) {
+                        return;
+                    }
+                    try {
+                        const detected = await this.scannerDetector.detect(this.$refs.cameraPreview);
+                        if (Array.isArray(detected) && detected.length > 0) {
+                            const barcode = String(detected[0].rawValue || '').trim();
+                            const now = Date.now();
+                            if (barcode !== '' && (barcode !== this.scannerLastCode || (now - this.scannerLastDetectedAt) > 1500)) {
+                                this.scannerLastCode = barcode;
+                                this.scannerLastDetectedAt = now;
+                                await this.handleScannedBarcode(barcode, 'camara');
+                            }
+                        }
+                    } catch (error) {
+                        this.cameraStatus = 'Buscando codigo. Mejora iluminacion si no detecta.';
+                    }
+                    if (this.scannerLoopRunning) {
+                        requestAnimationFrame(() => this.cameraScanLoop());
+                    }
+                },
+                closeCameraScanner() {
+                    this.showCameraModal = false;
+                    this.scannerLoopRunning = false;
+                    if (this.scannerStream) {
+                        this.scannerStream.getTracks().forEach(track => track.stop());
+                        this.scannerStream = null;
+                    }
+                    if (this.$refs.cameraPreview) {
+                        this.$refs.cameraPreview.srcObject = null;
+                    }
+                    this.cameraStatus = 'Camara detenida.';
                 },
                 async fetchProducts() {
                     const params = new URLSearchParams({ q: this.search });

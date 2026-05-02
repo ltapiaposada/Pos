@@ -38,6 +38,55 @@
             border: 1px solid #cbd5e1;
             border-radius: .6rem;
             background: #fff;
+            cursor: zoom-in;
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+        .cart-qr-thumb:hover {
+            transform: scale(1.04);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, .12);
+        }
+        .qr-lightbox {
+            position: fixed;
+            inset: 0;
+            z-index: 1080;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            background: rgba(15, 23, 42, .82);
+            backdrop-filter: blur(4px);
+        }
+        .qr-lightbox.is-open {
+            display: flex;
+        }
+        .qr-lightbox__dialog {
+            position: relative;
+            width: min(92vw, 540px);
+            border-radius: 1.25rem;
+            background: #fff;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+            padding: 1rem;
+        }
+        .qr-lightbox__close {
+            position: absolute;
+            top: .75rem;
+            right: .75rem;
+            border: 0;
+            border-radius: 999px;
+            width: 2.25rem;
+            height: 2.25rem;
+            background: rgba(15, 23, 42, .08);
+            color: #0f172a;
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+        .qr-lightbox__image {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 1rem;
+            border: 1px solid #cbd5e1;
+            background: #fff;
         }
         .cart-qty-form {
             display: flex;
@@ -114,6 +163,18 @@
             background: rgba(30, 58, 138, .24);
         }
         body.dark-mode .cart-qr-thumb {
+            border-color: rgba(100, 116, 139, .55);
+            background: #0f172a;
+        }
+        body.dark-mode .qr-lightbox__dialog {
+            background: #0f172a;
+            box-shadow: 0 24px 60px rgba(2, 6, 23, .55);
+        }
+        body.dark-mode .qr-lightbox__close {
+            background: rgba(148, 163, 184, .12);
+            color: #e2e8f0;
+        }
+        body.dark-mode .qr-lightbox__image {
             border-color: rgba(100, 116, 139, .55);
             background: #0f172a;
         }
@@ -238,7 +299,8 @@
                             <div class="cart-qr-note mt-3">
                                 <div class="small fw-semibold mb-1">Pago por QR disponible</div>
                                 <div class="small text-muted mb-2">Lo veras al finalizar compra.</div>
-                                <img src="{{ $paymentQrUrl }}" alt="QR de pago" class="cart-qr-thumb">
+                                <div class="small text-muted mb-2">Toca el QR para ampliarlo.</div>
+                                <img src="{{ $paymentQrUrl }}" alt="QR de pago" class="cart-qr-thumb js-qr-trigger">
                             </div>
                         @endif
                         <a href="{{ route('shop.checkout') }}" class="btn btn-primary w-100 mt-3">Ir a finalizar compra</a>
@@ -246,5 +308,49 @@
                 </div>
             </div>
         </div>
+    @endif
+    @if ($paymentQrUrl)
+        <div class="qr-lightbox" id="qr-lightbox" aria-hidden="true">
+            <div class="qr-lightbox__dialog" role="dialog" aria-modal="true" aria-label="QR de pago ampliado">
+                <button type="button" class="qr-lightbox__close" id="qr-lightbox-close" aria-label="Cerrar">&times;</button>
+                <img src="{{ $paymentQrUrl }}" alt="QR de pago ampliado" class="qr-lightbox__image">
+            </div>
+        </div>
+        <script>
+            (function () {
+                const trigger = document.querySelector('.js-qr-trigger');
+                const lightbox = document.getElementById('qr-lightbox');
+                const closeBtn = document.getElementById('qr-lightbox-close');
+
+                if (!trigger || !lightbox || !closeBtn) {
+                    return;
+                }
+
+                function closeLightbox() {
+                    lightbox.classList.remove('is-open');
+                    lightbox.setAttribute('aria-hidden', 'true');
+                    document.body.style.overflow = '';
+                }
+
+                function openLightbox() {
+                    lightbox.classList.add('is-open');
+                    lightbox.setAttribute('aria-hidden', 'false');
+                    document.body.style.overflow = 'hidden';
+                }
+
+                trigger.addEventListener('click', openLightbox);
+                closeBtn.addEventListener('click', closeLightbox);
+                lightbox.addEventListener('click', function (event) {
+                    if (event.target === lightbox) {
+                        closeLightbox();
+                    }
+                });
+                document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape' && lightbox.classList.contains('is-open')) {
+                        closeLightbox();
+                    }
+                });
+            })();
+        </script>
     @endif
 @endsection

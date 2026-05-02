@@ -9,7 +9,9 @@ use App\Models\Product;
 use App\Models\CashRegisterSession;
 use App\Models\Sale;
 use App\Services\SaleService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -98,6 +100,129 @@ class PosController extends Controller
         })->values();
 
         return response()->json($products);
+    }
+
+    public function resolveProduct(Request $request)
+    {
+        $barcode = trim((string) $request->query('barcode', ''));
+        if ($barcode === '') {
+            return response()->json([
+                'message' => 'Debes enviar un codigo de barras o SKU.',
+            ], 422);
+        }
+
+        $product = Product::query()
+            ->where('is_active', true)
+            ->where(function ($builder) use ($barcode) {
+                $builder->where('barcode', $barcode)
+                    ->orWhere('sku', $barcode);
+            })
+            ->with('tax:id,rate')
+            ->first();
+
+        if (!$product) {
+            return response()->json([
+                'message' => 'No se encontro un producto con ese codigo.',
+            ], 404);
+        }
+
+        return response()->json([
+            'id' => $product->id,
+            'name' => $product->name,
+            'sku' => $product->sku,
+            'barcode' => $product->barcode,
+            'sale_price' => (float) $product->sale_price,
+            'tax_rate' => (float) ($product->tax?->rate ?? 0),
+        ]);
+    }
+
+    public function createScannerSession(Request $request)
+    {
+        $token = Str::lower(Str::random(40));
+        $expiresAt = now()->addHours(2);
+        $session = [
+            'user_id' => $request->user()->id,
+            'expires_at' => $expiresAt->timestamp,
+        ];
+
+        Cache::put($this->scannerSessionKey($token), $session, $expiresAt);
+        Cache::put($this->scannerEventsKey($token), [], $expiresAt);
+
+        return response()->json([
+            'token' => $token,
+            'remote_url' => route('pos.scanner.remote', ['token' => $token]),
+            'expires_at' => $expiresAt->toIso8601String(),
+        ]);
+    }
+
+    public function pollScannerSession(Request $request, string $token)
+    {
+        $session = $this->getScannerSession($token);
+        if (!$session) {
+            return response()->json([
+                'message' => 'Sesion de escaneo expirada o invalida.',
+            ], 404);
+        }
+
+        if ((int) ($session['user_id'] ?? 0) !== (int) $request->user()->id) {
+            return response()->json([
+                'message' => 'No puedes leer esta sesion de escaneo.',
+            ], 403);
+        }
+
+        $events = Cache::get($this->scannerEventsKey($token), []);
+        Cache::put($this->scannerEventsKey($token), [], $this->scannerExpiryFromSession($session));
+
+        return response()->json([
+            'events' => is_array($events) ? $events : [],
+        ]);
+    }
+
+    public function remoteScanner(string $token)
+    {
+        $session = $this->getScannerSession($token);
+        abort_if(!$session, 404);
+
+        return view('pos.remote-scanner', [
+            'token' => $token,
+        ]);
+    }
+
+    public function receiveRemoteScan(Request $request, string $token)
+    {
+        $session = $this->getScannerSession($token);
+        if (!$session) {
+            return response()->json([
+                'message' => 'Sesion de escaneo expirada o invalida.',
+            ], 404);
+        }
+
+        $barcode = trim((string) $request->input('barcode', ''));
+        if ($barcode === '') {
+            return response()->json([
+                'message' => 'Debes enviar el codigo de barras.',
+            ], 422);
+        }
+
+        $events = Cache::get($this->scannerEventsKey($token), []);
+        if (!is_array($events)) {
+            $events = [];
+        }
+
+        $events[] = [
+            'barcode' => $barcode,
+            'scanned_at' => now()->toIso8601String(),
+        ];
+
+        Cache::put(
+            $this->scannerEventsKey($token),
+            array_slice($events, -30),
+            $this->scannerExpiryFromSession($session)
+        );
+
+        return response()->json([
+            'ok' => true,
+        ]);
     }
 
     public function checkout(SaleRequest $request, SaleService $saleService)
@@ -189,5 +314,40 @@ class PosController extends Controller
                 ]);
             }
         }
+    }
+
+    private function scannerSessionKey(string $token): string
+    {
+        return "pos_scanner_session:{$token}";
+    }
+
+    private function scannerEventsKey(string $token): string
+    {
+        return "pos_scanner_events:{$token}";
+    }
+
+    private function getScannerSession(string $token): ?array
+    {
+        $session = Cache::get($this->scannerSessionKey($token));
+        if (!is_array($session)) {
+            return null;
+        }
+
+        $expiresAt = (int) ($session['expires_at'] ?? 0);
+        if ($expiresAt <= now()->timestamp) {
+            Cache::forget($this->scannerSessionKey($token));
+            Cache::forget($this->scannerEventsKey($token));
+
+            return null;
+        }
+
+        return $session;
+    }
+
+    private function scannerExpiryFromSession(array $session): \DateTimeInterface
+    {
+        $expiresAt = (int) ($session['expires_at'] ?? now()->addHour()->timestamp);
+
+        return now()->setTimestamp(max(now()->timestamp + 60, $expiresAt));
     }
 }
