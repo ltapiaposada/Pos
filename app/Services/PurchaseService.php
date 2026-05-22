@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
+use App\Models\Branch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -14,6 +15,7 @@ class PurchaseService
     {
         return DB::transaction(function () use ($payload, $userId) {
             $branchId = (int) $payload['branch_id'];
+            $companyId = Branch::withoutGlobalScopes()->whereKey($branchId)->value('company_id');
             $items = $payload['items'];
 
             if (count($items) === 0) {
@@ -90,6 +92,7 @@ class PurchaseService
             $nextNumber = ((int) $lastNumber) + 1;
 
             $purchase = Purchase::query()->create([
+                'company_id' => $companyId,
                 'branch_id' => $branchId,
                 'user_id' => $userId,
                 'purchase_number' => $nextNumber,
@@ -110,6 +113,7 @@ class PurchaseService
             foreach ($lineItems as $line) {
                 PurchaseItem::query()->create([
                     ...$line,
+                    'company_id' => $companyId,
                     'purchase_id' => $purchase->id,
                 ]);
 

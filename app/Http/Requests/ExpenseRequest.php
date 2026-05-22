@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\AccountingAccount;
+use App\Support\CompanyRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -17,9 +18,9 @@ class ExpenseRequest extends FormRequest
     {
         return [
             'expense_date' => ['required', 'date'],
-            'expense_account_id' => ['required', 'integer', 'exists:accounting_accounts,id'],
+            'expense_account_id' => ['required', 'integer', CompanyRules::companyScoped('accounting_accounts')],
             'payment_method' => ['required', 'in:cash,bank,credit'],
-            'branch_id' => ['nullable', 'integer', 'exists:branches,id', 'required_if:payment_method,cash'],
+            'branch_id' => ['nullable', 'integer', CompanyRules::companyScoped('branches'), 'required_if:payment_method,cash'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'description' => ['required', 'string', 'max:255'],
         ];

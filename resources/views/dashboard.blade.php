@@ -33,6 +33,20 @@
         </div>
     </div>
 
+    @can('manage_settings')
+        <div class="mt-6 panel">
+            <div class="panel-body d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+                <div>
+                    <div class="text-sm font-semibold text-base-content/80">Implementacion multiempresa</div>
+                    <p class="mb-0 text-sm text-base-content/60">Consulta el checklist del proyecto y los hallazgos tecnicos antes de aplicar cambios grandes.</p>
+                </div>
+                <div>
+                    <a href="{{ route('admin.implementation-progress') }}" class="btn btn-outline-primary">Ver progreso</a>
+                </div>
+            </div>
+        </div>
+    @endcan
+
     <div class="mt-6 panel">
         <div class="panel-header">
             <h2 class="text-sm font-semibold text-base-content/80">Ventas recientes</h2>

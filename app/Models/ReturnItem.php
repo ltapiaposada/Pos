@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ReturnItem extends Model
 {
     use HasFactory;
+    use BelongsToCompany;
 
     protected $fillable = [
+        'company_id',
         'return_id',
         'product_id',
         'quantity',
@@ -28,6 +31,11 @@ class ReturnItem extends Model
     public function returnModel()
     {
         return $this->belongsTo(ReturnModel::class, 'return_id');
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function product()

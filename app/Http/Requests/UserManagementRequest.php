@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 class UserManagementRequest extends FormRequest
 {
@@ -18,6 +19,10 @@ class UserManagementRequest extends FormRequest
         $passwordRules = $this->isMethod('post')
             ? ['required', 'string', 'min:8', 'confirmed']
             : ['nullable', 'string', 'min:8', 'confirmed'];
+        $allowedRoles = Role::query()
+            ->when(! ($this->user()?->isSystemAdmin() ?? false), fn ($query) => $query->where('name', '!=', 'system_owner'))
+            ->pluck('name')
+            ->all();
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -25,7 +30,7 @@ class UserManagementRequest extends FormRequest
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'password' => $passwordRules,
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string', 'exists:roles,name'],
+            'roles.*' => ['string', Rule::in($allowedRoles)],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
         ];

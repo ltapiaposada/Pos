@@ -6,10 +6,38 @@
         ($product->exists ? $product->kitItems->map(fn ($item) => [
             'component_product_id' => $item->component_product_id,
             'quantity' => $item->quantity,
+            'component_unit' => $item->component_unit,
+            'component_unit_factor' => $item->component_unit_factor,
         ])->toArray() : [])
     );
     $kitItems = collect($rawKitItems)
         ->filter(fn ($item) => ! empty($item['component_product_id']) || ! empty($item['quantity']))
+        ->values()
+        ->all();
+    $rawModifierGroups = old(
+        'modifier_groups',
+        ($product->exists ? $product->modifierGroups->map(fn ($group) => [
+            'id' => $group->id,
+            'name' => $group->name,
+            'selection_type' => $group->selection_type,
+            'is_required' => $group->is_required,
+            'min_select' => $group->min_select,
+            'max_select' => $group->max_select,
+            'options' => $group->options->map(fn ($option) => [
+                'id' => $option->id,
+                'product_id' => $option->product_id,
+                'inventory_quantity' => $option->inventory_quantity,
+                'inventory_unit' => $option->inventory_unit,
+                'inventory_unit_factor' => $option->inventory_unit_factor,
+                'label' => $option->label,
+                'price_delta' => $option->price_delta,
+                'is_default' => $option->is_default,
+                'is_active' => $option->is_active,
+            ])->toArray(),
+        ])->toArray() : [])
+    );
+    $modifierGroups = collect($rawModifierGroups)
+        ->filter(fn ($group) => ! empty($group['name']) || ! empty($group['options']))
         ->values()
         ->all();
     $currentImage = old('image_url', $product->image_url ?? null);
@@ -182,17 +210,25 @@
     </div>
     <div>
         <label class="field-label">Activo</label>
+        @php($activeValue = (string) old('is_active', isset($product) ? (int) $product->is_active : 1))
         <select name="is_active" class="select select-bordered w-full" required>
-            <option value="1" @selected(old('is_active', $product->is_active ?? true))>Si</option>
-            <option value="0" @selected(old('is_active', $product->is_active ?? true) === false)>No</option>
+            <option value="1" @selected($activeValue === '1')>Si</option>
+            <option value="0" @selected($activeValue === '0')>No</option>
         </select>
+        @error('is_active')
+            <p class="mt-1 text-xs text-error">{{ $message }}</p>
+        @enderror
     </div>
     <div>
         <label class="field-label">Visible en e-commerce</label>
+        @php($visibleEcommerceValue = (string) old('is_visible_ecommerce', isset($product) ? (int) $product->is_visible_ecommerce : 1))
         <select name="is_visible_ecommerce" class="select select-bordered w-full" required>
-            <option value="1" @selected(old('is_visible_ecommerce', $product->is_visible_ecommerce ?? true))>Si</option>
-            <option value="0" @selected(old('is_visible_ecommerce', $product->is_visible_ecommerce ?? true) === false)>No</option>
+            <option value="1" @selected($visibleEcommerceValue === '1')>Si</option>
+            <option value="0" @selected($visibleEcommerceValue === '0')>No</option>
         </select>
+        @error('is_visible_ecommerce')
+            <p class="mt-1 text-xs text-error">{{ $message }}</p>
+        @enderror
     </div>
     <div class="sm:col-span-2">
         <label class="field-label">Descripcion</label>
@@ -202,13 +238,27 @@
 
 <div id="kit-fields" class="mt-6 hidden">
     <div class="flex items-center justify-between">
-        <h3 class="text-sm font-semibold">Componentes del kit</h3>
+        <div>
+            <h3 class="text-sm font-semibold">Receta o componentes del producto</h3>
+            <p class="text-xs text-base-content/60 mt-1">Define cuanta materia prima consume cada unidad vendida. Ejemplo: 250 g con factor 0.001 descuenta 0.250 de un stock base en kg.</p>
+        </div>
         <button type="button" class="btn btn-outline btn-xs" id="add-kit-item">Agregar componente</button>
     </div>
     <div id="kit-items-wrapper" class="mt-3 space-y-2"></div>
     @error('kit_items')
         <p class="text-xs text-error mt-2">{{ $message }}</p>
     @enderror
+</div>
+
+<div id="modifier-fields" class="mt-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h3 class="text-sm font-semibold">Componentes y elecciones del cliente</h3>
+            <p class="text-xs text-base-content/60 mt-1">Define proteínas, acompañamientos o ingredientes que se pueden quitar/agregar.</p>
+        </div>
+        <button type="button" class="btn btn-outline btn-xs" id="add-modifier-group">Agregar grupo</button>
+    </div>
+    <div id="modifier-groups-wrapper" class="mt-3 space-y-4"></div>
 </div>
 
 <div class="mt-6 flex gap-2">
@@ -218,21 +268,124 @@
 
 <template id="kit-item-template">
     <div class="grid grid-cols-1 gap-2 items-end sm:grid-cols-12 kit-item-row">
-        <div class="sm:col-span-8">
+        <div class="sm:col-span-5">
             <label class="field-label">Componente</label>
             <select class="select select-bordered w-full component-input">
                 <option value="">Selecciona un producto</option>
                 @foreach ($kitComponentCandidates as $candidate)
-                    <option value="{{ $candidate->id }}">{{ $candidate->name }} ({{ $candidate->sku }})</option>
+                    <option value="{{ $candidate->id }}" data-unit="{{ $candidate->unit }}">{{ $candidate->name }} ({{ $candidate->sku }})</option>
                 @endforeach
             </select>
         </div>
-        <div class="sm:col-span-3">
-            <label class="field-label">Cantidad</label>
+        <div class="sm:col-span-2">
+            <label class="field-label">Consumo visible</label>
             <input type="number" min="0.001" step="0.001" class="input input-bordered w-full quantity-input" value="1">
+        </div>
+        <div class="sm:col-span-2">
+            <label class="field-label">Unidad visible</label>
+            <input type="text" class="input input-bordered w-full component-unit-input" placeholder="g, ml, und">
+        </div>
+        <div class="sm:col-span-2">
+            <label class="field-label">Factor a stock</label>
+            <input type="number" min="0.000001" step="0.000001" class="input input-bordered w-full component-factor-input" value="1">
         </div>
         <div class="sm:col-span-1">
             <button type="button" class="btn btn-outline-danger btn-xs remove-kit-item">X</button>
+        </div>
+    </div>
+</template>
+
+<template id="modifier-group-template">
+    <div class="rounded-2xl border border-base-300 bg-base-100 p-4 modifier-group-row">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="xl:col-span-2">
+                <label class="field-label">Nombre del grupo</label>
+                <input type="text" class="input input-bordered w-full modifier-group-name" placeholder="Proteína, Ingredientes removibles, Acompañantes">
+            </div>
+            <div>
+                <label class="field-label">Tipo</label>
+                <select class="select select-bordered w-full modifier-group-type">
+                    <option value="single">Elegir una opción</option>
+                    <option value="multiple">Elegir varias opciones</option>
+                    <option value="remove">Quitar ingredientes</option>
+                </select>
+            </div>
+            <div>
+                <label class="field-label">Obligatorio</label>
+                <select class="select select-bordered w-full modifier-group-required">
+                    <option value="0">No</option>
+                    <option value="1">Sí</option>
+                </select>
+            </div>
+            <div>
+                <label class="field-label">Mínimo</label>
+                <input type="number" min="0" class="input input-bordered w-full modifier-group-min" value="0">
+            </div>
+            <div>
+                <label class="field-label">Máximo</label>
+                <input type="number" min="0" class="input input-bordered w-full modifier-group-max" value="1">
+            </div>
+            <div class="flex items-end justify-end xl:col-span-2">
+                <button type="button" class="btn btn-outline-danger btn-sm remove-modifier-group">Eliminar grupo</button>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="flex items-center justify-between">
+                <h4 class="text-sm font-medium">Opciones</h4>
+                <button type="button" class="btn btn-outline btn-xs add-modifier-option">Agregar opción</button>
+            </div>
+            <div class="modifier-options-wrapper mt-3 space-y-3"></div>
+        </div>
+    </div>
+</template>
+
+<template id="modifier-option-template">
+    <div class="grid gap-3 rounded-xl border border-base-200 p-3 modifier-option-row md:grid-cols-2 xl:grid-cols-8">
+        <div class="xl:col-span-2">
+            <label class="field-label">Producto relacionado</label>
+            <select class="select select-bordered w-full modifier-option-product">
+                <option value="">Selecciona un producto</option>
+                @foreach ($kitComponentCandidates as $candidate)
+                    <option value="{{ $candidate->id }}" data-unit="{{ $candidate->unit }}">{{ $candidate->name }} ({{ $candidate->sku }})</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="xl:col-span-2">
+            <label class="field-label">Etiqueta visible</label>
+            <input type="text" class="input input-bordered w-full modifier-option-label" placeholder="Carne, Cerdo, Sin cebolla">
+        </div>
+        <div>
+            <label class="field-label">Consumo</label>
+            <input type="number" min="0.001" step="0.001" class="input input-bordered w-full modifier-option-quantity" value="1">
+        </div>
+        <div>
+            <label class="field-label">Unidad visible</label>
+            <input type="text" class="input input-bordered w-full modifier-option-unit" placeholder="g, ml, und">
+        </div>
+        <div>
+            <label class="field-label">Factor a stock</label>
+            <input type="number" min="0.000001" step="0.000001" class="input input-bordered w-full modifier-option-factor" value="1">
+        </div>
+        <div>
+            <label class="field-label">Extra</label>
+            <input type="number" min="0" step="0.01" class="input input-bordered w-full modifier-option-price" value="0">
+        </div>
+        <div>
+            <label class="field-label">Por defecto</label>
+            <select class="select select-bordered w-full modifier-option-default">
+                <option value="0">No</option>
+                <option value="1">Sí</option>
+            </select>
+        </div>
+        <div>
+            <label class="field-label">Activa</label>
+            <select class="select select-bordered w-full modifier-option-active">
+                <option value="1">Sí</option>
+                <option value="0">No</option>
+            </select>
+        </div>
+        <div class="flex items-end justify-end">
+            <button type="button" class="btn btn-outline-danger btn-xs remove-modifier-option">Quitar</button>
         </div>
     </div>
 </template>
@@ -246,6 +399,11 @@
         const addBtn = document.getElementById('add-kit-item');
         const template = document.getElementById('kit-item-template');
         const initialItems = @json($kitItems);
+        const modifierGroupsWrapper = document.getElementById('modifier-groups-wrapper');
+        const addModifierGroupBtn = document.getElementById('add-modifier-group');
+        const modifierGroupTemplate = document.getElementById('modifier-group-template');
+        const modifierOptionTemplate = document.getElementById('modifier-option-template');
+        const initialModifierGroups = @json($modifierGroups);
 
         function toggleSections() {
             const type = typeSelect.value;
@@ -260,13 +418,19 @@
             rows.forEach((row, index) => {
                 const componentInput = row.querySelector('.component-input');
                 const quantityInput = row.querySelector('.quantity-input');
+                const componentUnitInput = row.querySelector('.component-unit-input');
+                const componentFactorInput = row.querySelector('.component-factor-input');
 
                 if (isKit) {
                     componentInput.name = `kit_items[${index}][component_product_id]`;
                     quantityInput.name = `kit_items[${index}][quantity]`;
+                    componentUnitInput.name = `kit_items[${index}][component_unit]`;
+                    componentFactorInput.name = `kit_items[${index}][component_unit_factor]`;
                 } else {
                     componentInput.name = '';
                     quantityInput.name = '';
+                    componentUnitInput.name = '';
+                    componentFactorInput.name = '';
                 }
             });
         }
@@ -275,12 +439,27 @@
             const node = template.content.firstElementChild.cloneNode(true);
             const componentInput = node.querySelector('.component-input');
             const quantityInput = node.querySelector('.quantity-input');
+            const componentUnitInput = node.querySelector('.component-unit-input');
+            const componentFactorInput = node.querySelector('.component-factor-input');
             const removeBtn = node.querySelector('.remove-kit-item');
 
             if (item) {
                 componentInput.value = item.component_product_id ?? '';
                 quantityInput.value = item.quantity ?? '1';
+                componentUnitInput.value = item.component_unit ?? '';
+                componentFactorInput.value = item.component_unit_factor ?? '1';
             }
+
+            componentInput.addEventListener('change', function () {
+                const selected = componentInput.options[componentInput.selectedIndex];
+                if (!selected) {
+                    return;
+                }
+
+                if (componentUnitInput.value.trim() === '' && selected.dataset.unit) {
+                    componentUnitInput.value = selected.dataset.unit;
+                }
+            });
 
             removeBtn.addEventListener('click', function () {
                 node.remove();
@@ -304,6 +483,181 @@
         }
 
         toggleSections();
+
+        function updateModifierInputNames() {
+            const groups = modifierGroupsWrapper.querySelectorAll('.modifier-group-row');
+            groups.forEach((groupRow, groupIndex) => {
+                const nameInput = groupRow.querySelector('.modifier-group-name');
+                const typeInput = groupRow.querySelector('.modifier-group-type');
+                const requiredInput = groupRow.querySelector('.modifier-group-required');
+                const minInput = groupRow.querySelector('.modifier-group-min');
+                const maxInput = groupRow.querySelector('.modifier-group-max');
+                const hiddenIdInput = groupRow.querySelector('.modifier-group-id');
+                hiddenIdInput.name = `modifier_groups[${groupIndex}][id]`;
+                nameInput.name = `modifier_groups[${groupIndex}][name]`;
+                typeInput.name = `modifier_groups[${groupIndex}][selection_type]`;
+                requiredInput.name = `modifier_groups[${groupIndex}][is_required]`;
+                minInput.name = `modifier_groups[${groupIndex}][min_select]`;
+                maxInput.name = `modifier_groups[${groupIndex}][max_select]`;
+
+                const optionRows = groupRow.querySelectorAll('.modifier-option-row');
+                optionRows.forEach((optionRow, optionIndex) => {
+                    optionRow.querySelector('.modifier-option-id').name = `modifier_groups[${groupIndex}][options][${optionIndex}][id]`;
+                    optionRow.querySelector('.modifier-option-product').name = `modifier_groups[${groupIndex}][options][${optionIndex}][product_id]`;
+                    optionRow.querySelector('.modifier-option-quantity').name = `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_quantity]`;
+                    optionRow.querySelector('.modifier-option-unit').name = `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_unit]`;
+                    optionRow.querySelector('.modifier-option-factor').name = `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_unit_factor]`;
+                    optionRow.querySelector('.modifier-option-label').name = `modifier_groups[${groupIndex}][options][${optionIndex}][label]`;
+                    optionRow.querySelector('.modifier-option-price').name = `modifier_groups[${groupIndex}][options][${optionIndex}][price_delta]`;
+                    optionRow.querySelector('.modifier-option-default').name = `modifier_groups[${groupIndex}][options][${optionIndex}][is_default]`;
+                    optionRow.querySelector('.modifier-option-active').name = `modifier_groups[${groupIndex}][options][${optionIndex}][is_active]`;
+                });
+            });
+        }
+
+        function syncGroupConstraints(groupRow) {
+            const typeInput = groupRow.querySelector('.modifier-group-type');
+            const requiredInput = groupRow.querySelector('.modifier-group-required');
+            const minInput = groupRow.querySelector('.modifier-group-min');
+            const maxInput = groupRow.querySelector('.modifier-group-max');
+            const defaultInputs = groupRow.querySelectorAll('.modifier-option-default');
+            const priceInputs = groupRow.querySelectorAll('.modifier-option-price');
+
+            if (typeInput.value === 'single') {
+                maxInput.value = '1';
+                maxInput.setAttribute('readonly', 'readonly');
+                if (requiredInput.value === '1') {
+                    minInput.value = '1';
+                } else if (parseInt(minInput.value || '0', 10) > 1) {
+                    minInput.value = '0';
+                }
+            } else {
+                maxInput.removeAttribute('readonly');
+            }
+
+            if (typeInput.value === 'remove') {
+                defaultInputs.forEach(input => {
+                    input.value = '1';
+                    input.setAttribute('readonly', 'readonly');
+                });
+                priceInputs.forEach(input => {
+                    input.value = '0';
+                    input.setAttribute('readonly', 'readonly');
+                });
+            } else {
+                defaultInputs.forEach(input => input.removeAttribute('readonly'));
+                priceInputs.forEach(input => input.removeAttribute('readonly'));
+            }
+        }
+
+        function bindOptionRow(optionRow, groupRow) {
+            const productInput = optionRow.querySelector('.modifier-option-product');
+            const labelInput = optionRow.querySelector('.modifier-option-label');
+            const unitInput = optionRow.querySelector('.modifier-option-unit');
+            const removeBtn = optionRow.querySelector('.remove-modifier-option');
+
+            productInput.addEventListener('change', function () {
+                if (labelInput.value.trim() !== '') {
+                    const selected = productInput.options[productInput.selectedIndex];
+                    if (unitInput.value.trim() === '' && selected && selected.dataset.unit) {
+                        unitInput.value = selected.dataset.unit;
+                    }
+                    return;
+                }
+                const selected = productInput.options[productInput.selectedIndex];
+                if (!selected || !selected.textContent) {
+                    return;
+                }
+                const label = selected.textContent.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                labelInput.value = label;
+                if (unitInput.value.trim() === '' && selected.dataset.unit) {
+                    unitInput.value = selected.dataset.unit;
+                }
+            });
+
+            removeBtn.addEventListener('click', function () {
+                optionRow.remove();
+                updateModifierInputNames();
+            });
+
+            syncGroupConstraints(groupRow);
+        }
+
+        function createOptionRow(groupRow, option = null) {
+            const optionRow = modifierOptionTemplate.content.firstElementChild.cloneNode(true);
+            const hiddenIdInput = document.createElement('input');
+            hiddenIdInput.type = 'hidden';
+            hiddenIdInput.className = 'modifier-option-id';
+            optionRow.prepend(hiddenIdInput);
+
+            if (option) {
+                hiddenIdInput.value = option.id ?? '';
+                optionRow.querySelector('.modifier-option-product').value = option.product_id ?? '';
+                optionRow.querySelector('.modifier-option-quantity').value = option.inventory_quantity ?? '1';
+                optionRow.querySelector('.modifier-option-unit').value = option.inventory_unit ?? '';
+                optionRow.querySelector('.modifier-option-factor').value = option.inventory_unit_factor ?? '1';
+                optionRow.querySelector('.modifier-option-label').value = option.label ?? '';
+                optionRow.querySelector('.modifier-option-price').value = option.price_delta ?? '0';
+                optionRow.querySelector('.modifier-option-default').value = option.is_default ? '1' : '0';
+                optionRow.querySelector('.modifier-option-active').value = option.is_active === false ? '0' : '1';
+            }
+
+            groupRow.querySelector('.modifier-options-wrapper').appendChild(optionRow);
+            bindOptionRow(optionRow, groupRow);
+            updateModifierInputNames();
+        }
+
+        function createModifierGroup(group = null) {
+            const groupRow = modifierGroupTemplate.content.firstElementChild.cloneNode(true);
+            const hiddenIdInput = document.createElement('input');
+            hiddenIdInput.type = 'hidden';
+            hiddenIdInput.className = 'modifier-group-id';
+            groupRow.prepend(hiddenIdInput);
+
+            if (group) {
+                hiddenIdInput.value = group.id ?? '';
+                groupRow.querySelector('.modifier-group-name').value = group.name ?? '';
+                groupRow.querySelector('.modifier-group-type').value = group.selection_type ?? 'single';
+                groupRow.querySelector('.modifier-group-required').value = group.is_required ? '1' : '0';
+                groupRow.querySelector('.modifier-group-min').value = group.min_select ?? 0;
+                groupRow.querySelector('.modifier-group-max').value = group.max_select ?? 1;
+            }
+
+            groupRow.querySelector('.remove-modifier-group').addEventListener('click', function () {
+                groupRow.remove();
+                updateModifierInputNames();
+            });
+
+            groupRow.querySelector('.add-modifier-option').addEventListener('click', function () {
+                createOptionRow(groupRow);
+            });
+
+            groupRow.querySelector('.modifier-group-type').addEventListener('change', function () {
+                syncGroupConstraints(groupRow);
+            });
+            groupRow.querySelector('.modifier-group-required').addEventListener('change', function () {
+                syncGroupConstraints(groupRow);
+            });
+
+            modifierGroupsWrapper.appendChild(groupRow);
+
+            if (group && Array.isArray(group.options) && group.options.length > 0) {
+                group.options.forEach(option => createOptionRow(groupRow, option));
+            } else {
+                createOptionRow(groupRow);
+            }
+
+            syncGroupConstraints(groupRow);
+            updateModifierInputNames();
+        }
+
+        addModifierGroupBtn.addEventListener('click', function () {
+            createModifierGroup();
+        });
+
+        if (initialModifierGroups.length > 0) {
+            initialModifierGroups.forEach(group => createModifierGroup(group));
+        }
     })();
 </script>
 <script>

@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\CashRegisterSession;
 use App\Models\Sale;
+use App\Services\InventoryService;
 use App\Services\SaleService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
@@ -38,10 +39,14 @@ class PosController extends Controller
         $oldItems = $this->normalizeOldInputArray($request->session()->getOldInput('items', []));
         $oldProductIds = collect($oldItems)->pluck('product_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
         $oldProducts = Product::query()
-            ->with('tax:id,rate')
+            ->with(['tax:id,rate', 'kitItems.componentProduct'])
             ->whereIn('id', $oldProductIds)
-            ->get(['id', 'name', 'sku', 'tax_id'])
+            ->get(['id', 'name', 'sku', 'tax_id', 'product_type'])
             ->keyBy('id');
+        $availableStockByProduct = app(InventoryService::class)->availableStockForProducts(
+            $oldProducts->values(),
+            (int) $branchId
+        );
 
         $oldPosState = [
             'branch_id' => (string) ($request->session()->getOldInput('branch_id') ?? $branchId),
@@ -57,6 +62,7 @@ class PosController extends Controller
                     'sku' => $product?->sku ?? 'N/A',
                     'quantity' => (float) ($item['quantity'] ?? 1),
                     'unit_price' => (float) ($item['unit_price'] ?? 0),
+                    'available_stock' => (float) ($availableStockByProduct[$productId] ?? 0),
                     'tax_rate' => (float) ($product?->tax?->rate ?? 0),
                     'discount_percent' => (($item['discount_type'] ?? null) === 'percent')
                         ? (float) ($item['discount_value'] ?? 0)
@@ -77,7 +83,8 @@ class PosController extends Controller
 
     public function products(Request $request)
     {
-        $query = Product::query()->where('is_active', true)->with('tax:id,rate');
+        $branchId = (int) $request->query('branch_id', $request->user()?->branch_id);
+        $query = Product::query()->where('is_active', true)->with(['tax:id,rate', 'kitItems.componentProduct']);
         if ($search = $request->get('q')) {
             $query->where(function ($builder) use ($search) {
                 $builder->where('name', 'like', "%{$search}%")
@@ -86,9 +93,15 @@ class PosController extends Controller
             });
         }
 
-        $products = $query->orderBy('name')->limit(20)->get([
-            'id', 'name', 'sku', 'barcode', 'sale_price', 'tax_id',
-        ])->map(function (Product $product) {
+        $products = $query->orderBy('name')->limit(60)->get([
+            'id', 'name', 'sku', 'barcode', 'sale_price', 'tax_id', 'product_type',
+        ]);
+
+        $availableByProduct = app(InventoryService::class)->availableStockForProducts($products, $branchId);
+
+        $products = $products->filter(function (Product $product) use ($availableByProduct) {
+            return (float) ($availableByProduct[$product->id] ?? 0) > 0;
+        })->take(20)->map(function (Product $product) use ($availableByProduct) {
             return [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -96,6 +109,7 @@ class PosController extends Controller
                 'barcode' => $product->barcode,
                 'sale_price' => (float) $product->sale_price,
                 'tax_rate' => (float) ($product->tax?->rate ?? 0),
+                'available_stock' => (float) ($availableByProduct[$product->id] ?? 0),
             ];
         })->values();
 
@@ -105,6 +119,7 @@ class PosController extends Controller
     public function resolveProduct(Request $request)
     {
         $barcode = trim((string) $request->query('barcode', ''));
+        $branchId = (int) $request->query('branch_id', $request->user()?->branch_id);
         if ($barcode === '') {
             return response()->json([
                 'message' => 'Debes enviar un codigo de barras o SKU.',
@@ -126,6 +141,13 @@ class PosController extends Controller
             ], 404);
         }
 
+        $availableStock = app(InventoryService::class)->availableStockForProduct($product, $branchId);
+        if ($availableStock <= 0) {
+            return response()->json([
+                'message' => 'El producto no tiene stock disponible en esta sucursal.',
+            ], 422);
+        }
+
         return response()->json([
             'id' => $product->id,
             'name' => $product->name,
@@ -133,6 +155,7 @@ class PosController extends Controller
             'barcode' => $product->barcode,
             'sale_price' => (float) $product->sale_price,
             'tax_rate' => (float) ($product->tax?->rate ?? 0),
+            'available_stock' => $availableStock,
         ]);
     }
 
@@ -265,7 +288,7 @@ class PosController extends Controller
         $query = Sale::query()
             ->with(['branch', 'customer', 'user'])
             ->where(function ($builder) {
-                $builder->where('order_source', Sale::SOURCE_POS)
+                $builder->whereIn('order_source', [Sale::SOURCE_POS, Sale::SOURCE_RESTAURANT])
                     ->orWhereNotNull('invoiced_at');
             })
             ->orderByDesc('sold_at')

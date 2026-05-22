@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Branch extends Model
 {
     use HasFactory;
+    use BelongsToCompany;
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'address',
@@ -19,6 +22,11 @@ class Branch extends Model
     public function users()
     {
         return $this->hasMany(User::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function inventories()

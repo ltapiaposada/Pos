@@ -164,6 +164,112 @@
         .kit-components-list li {
             margin: .15rem 0;
         }
+        .restaurant-configurator {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        .restaurant-configurator summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .8rem .95rem;
+            border-radius: .9rem;
+            border: 1px solid #bfdbfe;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            color: #0f172a;
+            font-weight: 700;
+            box-shadow: 0 10px 24px rgba(37, 99, 235, .08);
+        }
+        .restaurant-configurator summary::-webkit-details-marker {
+            display: none;
+        }
+        .restaurant-configurator summary::after {
+            content: "Abrir";
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 78px;
+            padding: .35rem .65rem;
+            border-radius: 999px;
+            background: #1d4ed8;
+            color: #fff;
+            font-size: .75rem;
+            font-weight: 700;
+            letter-spacing: .02em;
+        }
+        .restaurant-configurator[open] summary::after {
+            content: "Cerrar";
+            background: #0f172a;
+        }
+        .restaurant-configurator__label {
+            font-size: .78rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 700;
+        }
+        .restaurant-configurator__summary-copy {
+            display: flex;
+            flex-direction: column;
+            gap: .15rem;
+        }
+        .restaurant-configurator__summary-title {
+            font-size: .92rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+        .restaurant-configurator__group {
+            border: 1px solid #dbeafe;
+            border-radius: .95rem;
+            padding: .85rem;
+            background: #f8fbff;
+        }
+        .restaurant-configurator__title {
+            font-size: .88rem;
+            font-weight: 700;
+            margin-bottom: .2rem;
+            color: #0f172a;
+        }
+        .restaurant-configurator__hint {
+            font-size: .76rem;
+            color: #64748b;
+            margin-bottom: .65rem;
+        }
+        .restaurant-configurator__options {
+            display: grid;
+            gap: .55rem;
+        }
+        .restaurant-configurator__option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .55rem .7rem;
+            border-radius: .8rem;
+            background: #fff;
+            border: 1px solid #dbeafe;
+        }
+        .restaurant-configurator__option label {
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            margin: 0;
+            flex: 1;
+            cursor: pointer;
+            color: #0f172a;
+            font-size: .88rem;
+        }
+        .restaurant-configurator__price {
+            font-size: .76rem;
+            font-weight: 700;
+            color: #0369a1;
+            white-space: nowrap;
+        }
         body.dark-mode .shop-hero {
             background: radial-gradient(1200px 420px at 10% 10%, rgba(59, 130, 246, .25) 0%, rgba(59,130,246,0) 60%),
                         linear-gradient(135deg, #0b1220 0%, #1e3a8a 50%, #0369a1 100%);
@@ -241,6 +347,45 @@
             color: #e2e8f0;
             border-color: rgba(71, 85, 105, .5);
         }
+        body.dark-mode .restaurant-configurator {
+            border-top-color: rgba(71, 85, 105, .55);
+        }
+        body.dark-mode .restaurant-configurator summary,
+        body.dark-mode .restaurant-configurator__title,
+        body.dark-mode .restaurant-configurator__option label {
+            color: #e2e8f0;
+        }
+        body.dark-mode .restaurant-configurator summary {
+            background: linear-gradient(135deg, rgba(30, 64, 175, .35) 0%, rgba(3, 105, 161, .32) 100%);
+            border-color: rgba(125, 211, 252, .22);
+            box-shadow: 0 12px 28px rgba(2, 6, 23, .35);
+        }
+        body.dark-mode .restaurant-configurator summary::after {
+            background: #38bdf8;
+            color: #082f49;
+        }
+        body.dark-mode .restaurant-configurator[open] summary::after {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+        body.dark-mode .restaurant-configurator__label,
+        body.dark-mode .restaurant-configurator__hint {
+            color: #94a3b8;
+        }
+        body.dark-mode .restaurant-configurator__summary-title {
+            color: #e2e8f0;
+        }
+        body.dark-mode .restaurant-configurator__group {
+            background: rgba(15, 23, 42, .7);
+            border-color: rgba(59, 130, 246, .22);
+        }
+        body.dark-mode .restaurant-configurator__option {
+            background: rgba(15, 23, 42, .65);
+            border-color: rgba(71, 85, 105, .55);
+        }
+        body.dark-mode .restaurant-configurator__price {
+            color: #7dd3fc;
+        }
     </style>
 
     <section class="shop-hero mb-4">
@@ -287,6 +432,10 @@
             @php
                 $variantOptions = $product->variants;
                 $hasVariantOptions = $variantOptions->isNotEmpty();
+                $modifierGroups = $isRestaurantCatalog
+                    ? $product->modifierGroups->filter(fn ($group) => $group->options->isNotEmpty())->values()
+                    : collect();
+                $hasMenuCustomizer = $modifierGroups->isNotEmpty();
                 $defaultProductId = $hasVariantOptions
                     ? $variantOptions->first()->id
                     : $product->id;
@@ -350,40 +499,136 @@
                             </span>
                         </div>
 
-                        <form method="POST" action="{{ route('shop.cart.add') }}" class="mt-auto pt-3 d-flex flex-column gap-2 h-100">
-                            @csrf
-                            @if ($hasVariantOptions)
-                                <div class="w-100">
-                                    <div class="variant-choice-grid">
-                                    @foreach ($variantOptions as $variant)
+                        @if ($hasMenuCustomizer)
+                            <details class="restaurant-configurator">
+                                <summary>
+                                    <span class="restaurant-configurator__summary-copy">
+                                        <span class="restaurant-configurator__summary-title">Configurar producto</span>
+                                        <span class="restaurant-configurator__label">{{ $modifierGroups->count() }} grupos disponibles</span>
+                                    </span>
+                                </summary>
+
+                                <form method="POST" action="{{ route('shop.cart.add') }}" class="mt-3 d-flex flex-column gap-3">
+                                    @csrf
+                                    @if ($hasVariantOptions)
+                                        <div>
+                                            <div class="restaurant-configurator__title">Presentacion</div>
+                                            <div class="variant-choice-grid">
+                                                @foreach ($variantOptions as $variant)
+                                                    @php
+                                                        $variantLabel = $variant->name;
+                                                        if (preg_match('/talla\s+([a-z0-9]+)/i', $variant->name, $matches)) {
+                                                            $variantLabel = strtoupper($matches[1]);
+                                                        }
+                                                    @endphp
+                                                    <input
+                                                        class="variant-choice-input"
+                                                        type="radio"
+                                                        id="variant-{{ $product->id }}-{{ $variant->id }}"
+                                                        name="product_id"
+                                                        value="{{ $variant->id }}"
+                                                        @checked((int) $variant->id === (int) $defaultProductId)
+                                                    >
+                                                    <label class="variant-choice-label" for="variant-{{ $product->id }}-{{ $variant->id }}">
+                                                        {{ $variantLabel }}
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @else
+                                        <input type="hidden" name="product_id" value="{{ $defaultProductId }}">
+                                    @endif
+
+                                    @foreach ($modifierGroups as $group)
                                         @php
-                                            $variantLabel = $variant->name;
-                                            if (preg_match('/talla\s+([a-z0-9]+)/i', $variant->name, $matches)) {
-                                                $variantLabel = strtoupper($matches[1]);
-                                            }
+                                            $isSingle = $group->selection_type === \App\Models\ProductModifierGroup::TYPE_SINGLE;
+                                            $isRemove = $group->selection_type === \App\Models\ProductModifierGroup::TYPE_REMOVE;
+                                            $inputType = $isSingle ? 'radio' : 'checkbox';
+                                            $inputName = $isSingle ? "modifier_groups[{$group->id}]" : "modifier_groups[{$group->id}][]";
                                         @endphp
-                                        <input
-                                            class="variant-choice-input"
-                                            type="radio"
-                                            id="variant-{{ $product->id }}-{{ $variant->id }}"
-                                            name="product_id"
-                                            value="{{ $variant->id }}"
-                                            @checked((int) $variant->id === (int) $defaultProductId)
-                                        >
-                                        <label class="variant-choice-label" for="variant-{{ $product->id }}-{{ $variant->id }}">
-                                            {{ $variantLabel }}
-                                        </label>
+                                        <div class="restaurant-configurator__group">
+                                            <div class="restaurant-configurator__title">
+                                                {{ $group->name }}
+                                                @if ($group->is_required)
+                                                    <span class="text-danger">*</span>
+                                                @endif
+                                            </div>
+                                            <div class="restaurant-configurator__hint">
+                                                @if ($isRemove)
+                                                    Marca lo que no quieres en el plato.
+                                                @elseif ($isSingle)
+                                                    Elige una opcion.
+                                                @elseif ($group->is_required && (int) $group->min_select > 0)
+                                                    Debes elegir al menos {{ (int) $group->min_select }} opciones.
+                                                @else
+                                                    Puedes elegir varias opciones.
+                                                @endif
+                                            </div>
+                                            <div class="restaurant-configurator__options">
+                                                @foreach ($group->options as $option)
+                                                    <div class="restaurant-configurator__option">
+                                                        <label for="modifier-{{ $product->id }}-{{ $group->id }}-{{ $option->id }}">
+                                                                <input
+                                                                    id="modifier-{{ $product->id }}-{{ $group->id }}-{{ $option->id }}"
+                                                                    type="{{ $inputType }}"
+                                                                    name="{{ $inputName }}"
+                                                                    value="{{ $option->id }}"
+                                                                    @checked(! $isRemove && $option->is_default)
+                                                                    @required($group->is_required && $isSingle)
+                                                                >
+                                                            <span>{{ $isRemove ? 'Sin '.$option->label : $option->label }}</span>
+                                                        </label>
+                                                        @if (! $isRemove && (float) $option->price_delta > 0)
+                                                            <span class="restaurant-configurator__price">+ ${{ number_format((float) $option->price_delta, 2) }}</span>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
                                     @endforeach
+
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="number" min="1" max="999" name="quantity" value="1" class="form-control form-control-sm" style="max-width: 88px;">
+                                        <button type="submit" class="btn btn-primary btn-sm w-100">Agregar al carrito</button>
                                     </div>
+                                </form>
+                            </details>
+                        @else
+                            <form method="POST" action="{{ route('shop.cart.add') }}" class="mt-auto pt-3 d-flex flex-column gap-2 h-100">
+                                @csrf
+                                @if ($hasVariantOptions)
+                                    <div class="w-100">
+                                        <div class="variant-choice-grid">
+                                        @foreach ($variantOptions as $variant)
+                                            @php
+                                                $variantLabel = $variant->name;
+                                                if (preg_match('/talla\s+([a-z0-9]+)/i', $variant->name, $matches)) {
+                                                    $variantLabel = strtoupper($matches[1]);
+                                                }
+                                            @endphp
+                                            <input
+                                                class="variant-choice-input"
+                                                type="radio"
+                                                id="variant-{{ $product->id }}-{{ $variant->id }}"
+                                                name="product_id"
+                                                value="{{ $variant->id }}"
+                                                @checked((int) $variant->id === (int) $defaultProductId)
+                                            >
+                                            <label class="variant-choice-label" for="variant-{{ $product->id }}-{{ $variant->id }}">
+                                                {{ $variantLabel }}
+                                            </label>
+                                        @endforeach
+                                        </div>
+                                    </div>
+                                @else
+                                    <input type="hidden" name="product_id" value="{{ $defaultProductId }}">
+                                @endif
+                                <div class="d-flex gap-2 align-items-center mt-auto">
+                                    <input type="number" min="1" max="999" name="quantity" value="1" class="form-control form-control-sm" style="max-width: 88px;">
+                                    <button type="submit" class="btn btn-primary btn-sm w-100">Agregar</button>
                                 </div>
-                            @else
-                                <input type="hidden" name="product_id" value="{{ $defaultProductId }}">
-                            @endif
-                            <div class="d-flex gap-2 align-items-center mt-auto">
-                                <input type="number" min="1" max="999" name="quantity" value="1" class="form-control form-control-sm" style="max-width: 88px;">
-                                <button type="submit" class="btn btn-primary btn-sm w-100">Agregar</button>
-                            </div>
-                        </form>
+                            </form>
+                        @endif
                     </div>
                 </div>
             </div>

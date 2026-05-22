@@ -44,6 +44,91 @@
                 ];
             @endphp
 
+            @if ($restaurantOrders->isNotEmpty())
+                <div class="mt-6">
+                    <div class="mb-3">
+                        <h2 class="text-sm font-semibold">Pedidos web restaurante en trámite</h2>
+                        <p class="text-xs text-base-content/60 mt-1">Estos pedidos ya entraron al flujo de restaurante y todavía no se han convertido en venta.</p>
+                    </div>
+
+                    <div class="space-y-3 md:hidden">
+                        @foreach ($restaurantOrders as $order)
+                            <article class="surface-muted rounded-2xl p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-sm font-semibold">Pedido web #{{ $order->order_number }}</p>
+                                        <p class="text-xs text-base-content/60">{{ $order->opened_at?->format('Y-m-d H:i') }}</p>
+                                    </div>
+                                    <span class="badge badge-ghost badge-sm">{{ $restaurantStatusOptions[$order->status] ?? strtoupper($order->status) }}</span>
+                                </div>
+                                <div class="mt-3 space-y-1 text-sm">
+                                    <p><span class="text-base-content/60">Cliente:</span> {{ $order->customer?->name ?? 'Sin cliente' }}</p>
+                                    <p><span class="text-base-content/60">Tipo:</span> {{ \App\Models\RestaurantOrder::typeOptions()[$order->order_type] ?? $order->order_type }}</p>
+                                    <p><span class="text-base-content/60">Sucursal:</span> {{ $order->branch?->name ?? 'Sin sucursal' }}</p>
+                                </div>
+                                <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
+                                    <div class="rounded-xl border border-base-300 bg-base-100 px-3 py-2">
+                                        <p class="text-xs text-base-content/60">Estado</p>
+                                        <p class="font-semibold">{{ $restaurantStatusOptions[$order->status] ?? strtoupper($order->status) }}</p>
+                                    </div>
+                                    <div class="rounded-xl border border-base-300 bg-base-100 px-3 py-2 text-right">
+                                        <p class="text-xs text-base-content/60">Total</p>
+                                        <p class="font-semibold">${{ number_format((float) $order->total, 2) }}</p>
+                                    </div>
+                                </div>
+                                <div class="mt-3 grid grid-cols-1 gap-2">
+                                    <a href="{{ route('restaurant.orders.show', $order) }}" class="btn btn-outline btn-sm w-full">Abrir pedido restaurante</a>
+                                    <a href="{{ route('restaurant.kitchen.index', ['branch_id' => $order->branch_id]) }}" class="btn btn-primary btn-sm w-full">Ver en cocina</a>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+
+                    <div class="overflow-x-auto hidden md:block">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Pedido web</th>
+                                    <th>Fecha</th>
+                                    <th>Cliente</th>
+                                    <th>Tipo</th>
+                                    <th>Estado</th>
+                                    <th>Sucursal</th>
+                                    <th class="text-right">Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($restaurantOrders as $order)
+                                    <tr>
+                                        <td>#{{ $order->order_number }}</td>
+                                        <td>{{ $order->opened_at?->format('Y-m-d H:i') }}</td>
+                                        <td>{{ $order->customer?->name ?? 'Sin cliente' }}</td>
+                                        <td>{{ \App\Models\RestaurantOrder::typeOptions()[$order->order_type] ?? $order->order_type }}</td>
+                                        <td>{{ $restaurantStatusOptions[$order->status] ?? strtoupper($order->status) }}</td>
+                                        <td>{{ $order->branch?->name ?? 'Sin sucursal' }}</td>
+                                        <td class="text-right">${{ number_format((float) $order->total, 2) }}</td>
+                                        <td class="text-right">
+                                            <div class="actions justify-end">
+                                                <a href="{{ route('restaurant.orders.show', $order) }}" class="btn btn-outline btn-xs">Abrir pedido</a>
+                                                <a href="{{ route('restaurant.kitchen.index', ['branch_id' => $order->branch_id]) }}" class="btn btn-primary btn-xs">Cocina</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
+            <div class="mt-6">
+                <div class="mb-3">
+                    <h2 class="text-sm font-semibold">Ventas e-commerce registradas</h2>
+                    <p class="text-xs text-base-content/60 mt-1">Aquí aparecen los pedidos web clásicos o los que ya fueron convertidos a factura/venta.</p>
+                </div>
+            </div>
+
             <div class="mt-4 space-y-3 md:hidden">
                 @forelse ($orders as $order)
                     <article class="surface-muted rounded-2xl p-4">

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,12 +11,14 @@ use Illuminate\Support\Facades\Schema;
 class Customer extends Model
 {
     use HasFactory, SoftDeletes;
+    use BelongsToCompany;
 
     public const TYPE_PERSON = 'person';
     public const TYPE_COMPANY = 'company';
     public const TYPE_SUPPLIER = 'supplier';
 
     protected $fillable = [
+        'company_id',
         'user_id',
         'name',
         'document',
@@ -44,6 +47,11 @@ class Customer extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function sales()

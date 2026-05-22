@@ -44,6 +44,7 @@ class ReturnService
 
             $total = 0;
             $return = ReturnModel::query()->create([
+                'company_id' => $sale->company_id,
                 'sale_id' => $sale->id,
                 'branch_id' => $sale->branch_id,
                 'user_id' => $userId,
@@ -77,6 +78,7 @@ class ReturnService
                 $alreadyReturnedQtyByProduct->put((int) $item['product_id'], $alreadyReturned + $quantity);
 
                 ReturnItem::query()->create([
+                    'company_id' => $return->company_id,
                     'return_id' => $return->id,
                     'product_id' => $saleItem->product_id,
                     'quantity' => $quantity,

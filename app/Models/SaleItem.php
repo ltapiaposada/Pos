@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class SaleItem extends Model
 {
     use HasFactory;
+    use BelongsToCompany;
 
     protected $fillable = [
+        'company_id',
         'sale_id',
         'product_id',
         'product_name',
@@ -36,6 +39,11 @@ class SaleItem extends Model
     public function sale()
     {
         return $this->belongsTo(Sale::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function product()

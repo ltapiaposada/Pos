@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Models\AccountingAccount;
+use App\Support\CompanyContext;
+use App\Support\CompanyRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -17,9 +19,10 @@ class AccountingAccountRequest extends FormRequest
     public function rules(): array
     {
         $accountId = $this->route('account')?->id;
+        $companyId = CompanyContext::authenticatedCompanyId();
 
         return [
-            'code' => ['required', 'string', 'max:30', 'regex:/^[0-9]+$/', Rule::unique('accounting_accounts', 'code')->ignore($accountId)],
+            'code' => ['required', 'string', 'max:30', 'regex:/^[0-9]+$/', Rule::unique('accounting_accounts', 'code')->where(fn ($query) => $query->where('company_id', $companyId))->ignore($accountId)],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in([
                 AccountingAccount::TYPE_ASSET,
@@ -32,7 +35,7 @@ class AccountingAccountRequest extends FormRequest
                 AccountingAccount::NATURE_DEBIT,
                 AccountingAccount::NATURE_CREDIT,
             ])],
-            'parent_account_id' => ['nullable', 'integer', 'exists:accounting_accounts,id'],
+            'parent_account_id' => ['nullable', 'integer', CompanyRules::companyScoped('accounting_accounts')],
             'is_postable' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
         ];

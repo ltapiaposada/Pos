@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UserManagementRequest;
 use App\Models\Branch;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -24,6 +26,10 @@ class UserManagementController extends Controller
         $query = User::query()
             ->with(['branch', 'roles'])
             ->select('users.*');
+
+        if (! $request->user()->isSystemAdmin()) {
+            $query->where('company_id', $request->user()->company_id);
+        }
 
         if ($search = trim((string) $request->get('q'))) {
             $query->where(function ($builder) use ($search) {
@@ -62,7 +68,10 @@ class UserManagementController extends Controller
 
         $users = $query->paginate(20)->withQueryString();
         $branches = Branch::query()->orderBy('name')->get(['id', 'name']);
-        $roles = Role::query()->orderBy('name')->get(['id', 'name']);
+        $roles = Role::query()
+            ->when(! $request->user()->isSystemAdmin(), fn ($query) => $query->where('name', '!=', 'system_owner'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return view('security.users.index', compact('users', 'branches', 'roles', 'sort', 'dir'));
     }
@@ -70,8 +79,14 @@ class UserManagementController extends Controller
     public function create()
     {
         $branches = Branch::query()->orderBy('name')->get(['id', 'name']);
-        $roles = Role::query()->orderBy('name')->get(['id', 'name']);
-        $permissions = Permission::query()->orderBy('name')->get(['id', 'name']);
+        $roles = Role::query()
+            ->when(! request()->user()->isSystemAdmin(), fn ($query) => $query->where('name', '!=', 'system_owner'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $permissions = Permission::query()
+            ->when(! request()->user()->isSystemAdmin(), fn ($query) => $query->whereNotIn('name', ['manage_companies', 'manage_subscriptions']))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return view('security.users.create', compact('branches', 'roles', 'permissions'));
     }
@@ -80,7 +95,14 @@ class UserManagementController extends Controller
     {
         $payload = $request->validated();
 
+        if (! CompanyContext::branchBelongsToCompany($payload['branch_id'] ?? null, $request->user()->company_id)) {
+            throw ValidationException::withMessages([
+                'branch_id' => 'La sucursal seleccionada no pertenece a tu empresa.',
+            ]);
+        }
+
         $user = User::query()->create([
+            'company_id' => $request->user()->company_id,
             'name' => $payload['name'],
             'email' => $payload['email'],
             'branch_id' => $payload['branch_id'] ?? null,
@@ -95,19 +117,40 @@ class UserManagementController extends Controller
 
     public function edit(User $user)
     {
+        if (! request()->user()->isSystemAdmin() && (int) $user->company_id !== (int) request()->user()->company_id) {
+            abort(404);
+        }
+
         $user->load(['roles', 'permissions']);
         $branches = Branch::query()->orderBy('name')->get(['id', 'name']);
-        $roles = Role::query()->orderBy('name')->get(['id', 'name']);
-        $permissions = Permission::query()->orderBy('name')->get(['id', 'name']);
+        $roles = Role::query()
+            ->when(! request()->user()->isSystemAdmin(), fn ($query) => $query->where('name', '!=', 'system_owner'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $permissions = Permission::query()
+            ->when(! request()->user()->isSystemAdmin(), fn ($query) => $query->whereNotIn('name', ['manage_companies', 'manage_subscriptions']))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return view('security.users.edit', compact('user', 'branches', 'roles', 'permissions'));
     }
 
     public function update(UserManagementRequest $request, User $user)
     {
+        if (! $request->user()->isSystemAdmin() && (int) $user->company_id !== (int) $request->user()->company_id) {
+            abort(404);
+        }
+
         $payload = $request->validated();
 
+        if (! CompanyContext::branchBelongsToCompany($payload['branch_id'] ?? null, $request->user()->company_id)) {
+            throw ValidationException::withMessages([
+                'branch_id' => 'La sucursal seleccionada no pertenece a tu empresa.',
+            ]);
+        }
+
         $data = [
+            'company_id' => $request->user()->company_id,
             'name' => $payload['name'],
             'email' => $payload['email'],
             'branch_id' => $payload['branch_id'] ?? null,

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Setting;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class EcommerceCheckoutRequest extends FormRequest
 {
@@ -16,7 +17,13 @@ class EcommerceCheckoutRequest extends FormRequest
     {
         return [
             'phone' => ['nullable', 'string', 'max:32'],
-            'address' => ['required', 'string', 'max:255'],
+            'fulfillment_type' => ['nullable', Rule::in(['delivery', 'takeaway'])],
+            'address' => [
+                Rule::requiredIf(fn () => $this->input('fulfillment_type', 'delivery') !== 'takeaway'),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'payment_method' => ['required', 'in:card,transfer,qr,contraentrega,other'],
             'payment_reference' => ['nullable', 'required_if:payment_method,transfer,qr', 'string', 'max:100'],
             'coupon_code' => ['nullable', 'string', 'max:50'],

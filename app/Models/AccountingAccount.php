@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class AccountingAccount extends Model
 {
     use HasFactory;
+    use BelongsToCompany;
 
     protected $fillable = [
+        'company_id',
         'code',
         'name',
         'type',
@@ -38,6 +41,11 @@ class AccountingAccount extends Model
     public function lines()
     {
         return $this->hasMany(JournalEntryLine::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function parent()

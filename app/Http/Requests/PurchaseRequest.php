@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Customer;
+use App\Support\CompanyRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -30,8 +31,8 @@ class PurchaseRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'branch_id' => ['required', 'integer', 'exists:branches,id'],
-            'contact_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'branch_id' => ['required', 'integer', CompanyRules::companyScoped('branches')],
+            'contact_id' => ['nullable', 'integer', CompanyRules::companyScoped('customers')],
             'supplier_name' => ['required', 'string', 'max:255'],
             'supplier_document' => ['nullable', 'string', 'max:100'],
             'invoice_number' => ['nullable', 'string', 'max:100'],
@@ -39,7 +40,7 @@ class PurchaseRequest extends FormRequest
             'payment_method' => ['required', 'in:cash,transfer,credit'],
             'paid_total' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', CompanyRules::companyScoped('products')],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
         ];

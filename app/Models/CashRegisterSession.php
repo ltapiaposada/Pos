@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompanyThroughBranch;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class CashRegisterSession extends Model
 {
     use HasFactory;
+    use BelongsToCompanyThroughBranch;
 
     protected $fillable = [
+        'company_id',
         'branch_id',
         'user_id',
         'opened_at',
@@ -33,6 +36,11 @@ class CashRegisterSession extends Model
     public function branch()
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function user()

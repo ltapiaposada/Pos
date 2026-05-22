@@ -13,6 +13,8 @@ class RolePermissionSeeder extends Seeder
         $permissions = [
             'manage_users',
             'manage_settings',
+            'manage_companies',
+            'manage_subscriptions',
             'manage_products',
             'manage_categories',
             'manage_branches',
@@ -30,6 +32,8 @@ class RolePermissionSeeder extends Seeder
             'manage_purchases',
             'manage_accounting',
             'manage_ecommerce_orders',
+            'manage_restaurant',
+            'manage_restaurant_kitchen',
         ];
 
         foreach ($permissions as $permission) {
@@ -40,6 +44,7 @@ class RolePermissionSeeder extends Seeder
         $supervisor = Role::firstOrCreate(['name' => 'supervisor']);
         $cashier = Role::firstOrCreate(['name' => 'cashier']);
         $customer = Role::firstOrCreate(['name' => 'customer']);
+        $systemOwner = Role::firstOrCreate(['name' => 'system_owner']);
 
         $admin->syncPermissions($permissions);
         $supervisor->syncPermissions([
@@ -60,6 +65,8 @@ class RolePermissionSeeder extends Seeder
             'manage_purchases',
             'manage_accounting',
             'manage_ecommerce_orders',
+            'manage_restaurant',
+            'manage_restaurant_kitchen',
         ]);
         $cashier->syncPermissions([
             'open_cash_register',
@@ -67,7 +74,10 @@ class RolePermissionSeeder extends Seeder
             'record_cash_movement',
             'create_sale',
             'apply_discount',
+            'manage_restaurant',
+            'manage_restaurant_kitchen',
         ]);
         $customer->syncPermissions([]);
+        $systemOwner->syncPermissions($permissions);
     }
 }

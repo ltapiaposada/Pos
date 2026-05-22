@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PurchaseItem extends Model
 {
     use HasFactory;
+    use BelongsToCompany;
 
     protected $fillable = [
+        'company_id',
         'purchase_id',
         'product_id',
         'product_name',
@@ -32,6 +35,11 @@ class PurchaseItem extends Model
     public function purchase()
     {
         return $this->belongsTo(Purchase::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function product()

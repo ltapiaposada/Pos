@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,6 +11,7 @@ use App\Support\StorefrontCache;
 class Product extends Model
 {
     use HasFactory, SoftDeletes;
+    use BelongsToCompany;
 
     protected static function booted(): void
     {
@@ -24,6 +26,7 @@ class Product extends Model
     }
 
     protected $fillable = [
+        'company_id',
         'category_id',
         'tax_id',
         'name',
@@ -54,6 +57,11 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function tax()
@@ -98,5 +106,10 @@ class Product extends Model
         return $this->belongsToMany(Product::class, 'product_kit_items', 'component_product_id', 'kit_product_id')
             ->withPivot('quantity')
             ->withTimestamps();
+    }
+
+    public function modifierGroups()
+    {
+        return $this->hasMany(ProductModifierGroup::class)->orderBy('display_order')->orderBy('id');
     }
 }

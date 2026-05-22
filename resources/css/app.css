@@ -350,6 +350,604 @@
         @apply rounded-xl border border-base-200/70 bg-base-200/45;
     }
 
+    .restaurant-floor-header {
+        background:
+            radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 30%),
+            radial-gradient(circle at top right, rgba(16, 185, 129, 0.12), transparent 28%),
+            linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(241, 245, 249, 0.88));
+    }
+
+    .restaurant-floor-kpis {
+        @apply mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .restaurant-floor-kpi {
+        @apply rounded-2xl border border-base-200/80 bg-white/80 p-4 shadow-[0_18px_34px_-26px_rgba(15,23,42,0.45)] backdrop-blur;
+    }
+
+    .restaurant-floor-kpi__label {
+        @apply text-[0.7rem] font-semibold uppercase tracking-[0.16em];
+        color: rgb(var(--base-content) / 0.45);
+    }
+
+    .restaurant-floor-kpi__value {
+        @apply mt-2 block text-3xl font-semibold tracking-tight text-base-content;
+    }
+
+    .restaurant-floor-kpi__hint {
+        @apply mt-1 block text-xs;
+        color: rgb(var(--base-content) / 0.55);
+    }
+
+    .restaurant-side-panel {
+        position: sticky;
+        top: 1rem;
+    }
+
+    .restaurant-side-panel__heading {
+        @apply flex items-start justify-between gap-3;
+    }
+
+    .restaurant-mini-stat {
+        @apply flex items-center justify-between rounded-2xl border px-4 py-3 text-sm;
+        border-color: rgb(var(--base-300) / 0.7);
+        background: rgba(255, 255, 255, 0.7);
+    }
+
+    .restaurant-mini-stat strong {
+        @apply text-base font-semibold;
+    }
+
+    .restaurant-mini-stat--reserved {
+        border-color: rgba(2, 132, 199, 0.28);
+        background: rgba(224, 242, 254, 0.72);
+    }
+
+    .restaurant-mini-stat--cleaning {
+        border-color: rgba(100, 116, 139, 0.28);
+        background: rgba(241, 245, 249, 0.85);
+    }
+
+    .restaurant-mini-stat--inactive {
+        border-color: rgba(220, 38, 38, 0.2);
+        background: rgba(254, 242, 242, 0.82);
+    }
+
+    .restaurant-toolbar {
+        @apply flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between;
+    }
+
+    .restaurant-toolbar__filters {
+        @apply flex flex-wrap items-center gap-2;
+    }
+
+    .restaurant-toolbar__filters .input {
+        min-width: 13rem;
+    }
+
+    .restaurant-status-pills {
+        @apply mt-4 flex flex-wrap gap-2;
+    }
+
+    .restaurant-status-pill {
+        @apply inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-wide;
+        border-color: rgb(var(--base-300) / 0.8);
+        background: rgba(255, 255, 255, 0.72);
+        color: rgb(var(--base-content) / 0.75);
+    }
+
+    .restaurant-status-pill strong {
+        @apply rounded-full px-2 py-0.5 text-[0.68rem];
+        background: rgba(15, 23, 42, 0.08);
+    }
+
+    .restaurant-table-card {
+        @apply rounded-[1.6rem] border p-4 shadow-[0_26px_44px_-32px_rgba(15,23,42,0.5)] transition duration-200;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+        border-color: rgba(203, 213, 225, 0.82);
+    }
+
+    .restaurant-table-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 28px 50px -30px rgba(15, 23, 42, 0.55);
+    }
+
+    .restaurant-table-card__top {
+        @apply flex items-start justify-between gap-3;
+    }
+
+    .restaurant-table-card__eyebrow {
+        @apply flex flex-wrap items-center gap-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em];
+        color: rgb(var(--base-content) / 0.45);
+    }
+
+    .restaurant-table-card__title {
+        @apply mt-2 text-lg font-semibold tracking-tight text-base-content;
+    }
+
+    .restaurant-table-card__layout {
+        @apply mt-4 flex items-center gap-4;
+    }
+
+    .restaurant-table-card__avatar {
+        @apply flex h-14 w-14 items-center justify-center rounded-2xl text-lg;
+        background: rgba(37, 99, 235, 0.08);
+        color: #1d4ed8;
+    }
+
+    .restaurant-table-card__metrics {
+        @apply flex min-w-0 flex-1 flex-col gap-1.5 text-sm;
+        color: rgb(var(--base-content) / 0.72);
+    }
+
+    .restaurant-table-card__metrics span {
+        @apply inline-flex items-center gap-2;
+    }
+
+    .restaurant-table-order {
+        @apply mt-4 flex items-center justify-between gap-3 rounded-2xl border p-3;
+        border-color: rgba(148, 163, 184, 0.26);
+        background: rgba(255, 255, 255, 0.72);
+    }
+
+    .restaurant-table-order__title {
+        @apply text-sm font-semibold text-base-content;
+    }
+
+    .restaurant-table-order__meta {
+        @apply mt-1 text-xs;
+        color: rgb(var(--base-content) / 0.58);
+    }
+
+    .restaurant-table-order--empty {
+        @apply justify-start;
+        background: rgba(241, 245, 249, 0.7);
+    }
+
+    .restaurant-table-editor {
+        @apply mt-4 rounded-2xl border border-base-200/80 bg-base-100/75 p-3;
+    }
+
+    .restaurant-table-editor summary {
+        @apply flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-base-content/70;
+    }
+
+    .restaurant-table-editor[open] summary {
+        @apply mb-2 text-base-content;
+    }
+
+    .restaurant-empty-state {
+        @apply rounded-[1.8rem] border border-dashed border-base-300/90 bg-base-100/85 px-6 py-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.6)];
+    }
+
+    .restaurant-empty-state__icon {
+        @apply mx-auto flex h-16 w-16 items-center justify-center rounded-3xl text-2xl;
+        background: rgba(37, 99, 235, 0.08);
+        color: #2563eb;
+    }
+
+    .restaurant-empty-state h3 {
+        @apply mt-4 text-lg font-semibold text-base-content;
+    }
+
+    .restaurant-empty-state p {
+        @apply mt-2 text-sm text-base-content/60;
+    }
+
+    .restaurant-table--available {
+        box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.18), 0 26px 44px -32px rgba(15, 23, 42, 0.5);
+    }
+
+    .restaurant-table--occupied {
+        box-shadow: inset 0 0 0 1px rgba(202, 138, 4, 0.22), 0 26px 44px -32px rgba(15, 23, 42, 0.5);
+    }
+
+    .restaurant-table--reserved {
+        box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.18), 0 26px 44px -32px rgba(15, 23, 42, 0.5);
+    }
+
+    .restaurant-table--cleaning {
+        box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.18), 0 26px 44px -32px rgba(15, 23, 42, 0.5);
+    }
+
+    .restaurant-table--inactive {
+        box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.18), 0 26px 44px -32px rgba(15, 23, 42, 0.5);
+        opacity: 0.9;
+    }
+
+    .restaurant-floor-grid {
+        display: grid;
+        gap: 0.9rem;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .restaurant-map-card {
+        @apply rounded-[1.2rem] border p-3 shadow-[0_18px_34px_-28px_rgba(15,23,42,0.52)] transition duration-200;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(248, 250, 252, 0.94));
+        border-color: rgba(203, 213, 225, 0.8);
+        min-height: 150px;
+    }
+
+    .restaurant-map-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 38px -24px rgba(15, 23, 42, 0.5);
+    }
+
+    .restaurant-map-card__top {
+        @apply flex items-start justify-between gap-2;
+    }
+
+    .restaurant-map-card__identity {
+        @apply flex min-w-0 items-start gap-2.5;
+    }
+
+    .restaurant-map-card__number {
+        @apply inline-flex h-10 min-w-[2.7rem] items-center justify-center rounded-2xl px-2 text-xs font-bold tracking-wide;
+        background: rgba(15, 23, 42, 0.06);
+        color: rgb(var(--base-content));
+    }
+
+    .restaurant-map-card__labels {
+        @apply min-w-0;
+    }
+
+    .restaurant-map-card__name {
+        @apply truncate text-sm font-semibold text-base-content;
+    }
+
+    .restaurant-map-card__zone {
+        @apply mt-0.5 truncate text-[0.72rem];
+        color: rgb(var(--base-content) / 0.56);
+    }
+
+    .restaurant-map-card__status {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em];
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(203, 213, 225, 0.72);
+        color: rgb(var(--base-content) / 0.68);
+        white-space: nowrap;
+    }
+
+    .restaurant-map-card__dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        display: inline-block;
+    }
+
+    .restaurant-map-card__dot--available { background: #16a34a; }
+    .restaurant-map-card__dot--occupied { background: #ca8a04; }
+    .restaurant-map-card__dot--reserved { background: #0284c7; }
+    .restaurant-map-card__dot--cleaning { background: #64748b; }
+    .restaurant-map-card__dot--inactive { background: #dc2626; }
+
+    .restaurant-map-card__meta {
+        @apply mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[0.72rem];
+        color: rgb(var(--base-content) / 0.62);
+    }
+
+    .restaurant-map-card__meta span {
+        @apply inline-flex items-center gap-1.5;
+    }
+
+    .restaurant-map-card__order {
+        @apply mt-3 flex items-center justify-between gap-2 rounded-2xl border px-3 py-2;
+        border-color: rgba(148, 163, 184, 0.22);
+        background: rgba(255, 255, 255, 0.78);
+    }
+
+    .restaurant-map-card__order-id {
+        @apply text-xs font-semibold text-base-content;
+    }
+
+    .restaurant-map-card__order-status,
+    .restaurant-map-card__order-customer,
+    .restaurant-map-card__disabled {
+        @apply mt-0.5 text-[0.72rem];
+        color: rgb(var(--base-content) / 0.58);
+    }
+
+    .restaurant-map-card__quick-open {
+        @apply mt-3;
+    }
+
+    .restaurant-map-card--available {
+        box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.14), 0 18px 34px -28px rgba(15, 23, 42, 0.52);
+    }
+
+    .restaurant-map-card--occupied {
+        box-shadow: inset 0 0 0 1px rgba(202, 138, 4, 0.16), 0 18px 34px -28px rgba(15, 23, 42, 0.52);
+    }
+
+    .restaurant-map-card--reserved {
+        box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.14), 0 18px 34px -28px rgba(15, 23, 42, 0.52);
+    }
+
+    .restaurant-map-card--cleaning {
+        box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.14), 0 18px 34px -28px rgba(15, 23, 42, 0.52);
+    }
+
+    .restaurant-map-card--inactive {
+        box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.14), 0 18px 34px -28px rgba(15, 23, 42, 0.52);
+        opacity: 0.94;
+    }
+
+    .restaurant-workspace {
+        align-items: start;
+    }
+
+    .restaurant-module-header {
+        background:
+            radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 28%),
+            radial-gradient(circle at top right, rgba(16, 185, 129, 0.11), transparent 24%),
+            linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.9));
+    }
+
+    .restaurant-header-chips {
+        @apply flex flex-wrap gap-2;
+    }
+
+    .restaurant-module-panel {
+        overflow: hidden;
+    }
+
+    .restaurant-form-panel__header {
+        @apply mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between;
+    }
+
+    .restaurant-order-meta-grid {
+        @apply grid gap-4 md:grid-cols-2;
+    }
+
+    .restaurant-order-toolbar {
+        @apply flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between;
+    }
+
+    .restaurant-order-toolbar__actions {
+        @apply flex flex-wrap items-center gap-2;
+    }
+
+    .restaurant-order-toolbar__actions .input {
+        min-width: 12rem;
+    }
+
+    .restaurant-order-products-grid {
+        display: grid;
+        gap: 0.85rem;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        margin-top: 1.25rem;
+    }
+
+    .restaurant-order-product-card {
+        @apply text-left;
+        border-radius: 1.15rem;
+        border: 1px solid rgba(203, 213, 225, 0.82);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+        box-shadow: 0 16px 30px -26px rgba(15, 23, 42, 0.38);
+        transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    }
+
+    .restaurant-order-product-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(59, 130, 246, 0.34);
+        box-shadow: 0 20px 34px -24px rgba(37, 99, 235, 0.22);
+    }
+
+    .restaurant-order-product-card__body {
+        @apply p-4;
+    }
+
+    .restaurant-order-product-card__title {
+        @apply text-sm font-semibold text-base-content;
+    }
+
+    .restaurant-order-product-card__meta {
+        @apply mt-1 text-[0.72rem];
+        color: rgb(var(--base-content) / 0.56);
+    }
+
+    .restaurant-order-product-card__price {
+        @apply mt-4 text-lg font-semibold tracking-tight text-primary;
+    }
+
+    .restaurant-order-product-card__hint {
+        @apply mt-2 text-[0.7rem] font-semibold uppercase tracking-[0.12em];
+        color: rgb(var(--info));
+    }
+
+    .restaurant-empty-inline {
+        @apply rounded-2xl border border-dashed px-4 py-5 text-sm;
+        border-color: rgba(148, 163, 184, 0.45);
+        background: rgba(248, 250, 252, 0.8);
+        color: rgb(var(--base-content) / 0.62);
+    }
+
+    .restaurant-order-line {
+        @apply rounded-[1.35rem] border p-4;
+        border-color: rgba(203, 213, 225, 0.78);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+        box-shadow: 0 18px 30px -28px rgba(15, 23, 42, 0.35);
+    }
+
+    .restaurant-order-line__top {
+        @apply flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
+    }
+
+    .restaurant-order-line__grid {
+        @apply mt-4 grid gap-3 md:grid-cols-3;
+    }
+
+    .restaurant-order-modifier {
+        @apply rounded-2xl border p-3;
+        border-color: rgba(203, 213, 225, 0.78);
+        background: rgba(248, 250, 252, 0.8);
+    }
+
+    .restaurant-order-footer {
+        @apply mt-6 flex flex-col gap-4 rounded-[1.5rem] border p-4 lg:flex-row lg:items-end lg:justify-between;
+        border-color: rgba(203, 213, 225, 0.82);
+        background: rgba(255, 255, 255, 0.86);
+    }
+
+    .restaurant-order-totals {
+        @apply rounded-2xl border p-4 text-sm;
+        min-width: min(100%, 18rem);
+        border-color: rgba(148, 163, 184, 0.34);
+        background: rgba(248, 250, 252, 0.86);
+        color: rgb(var(--base-content) / 0.76);
+    }
+
+    .restaurant-side-stack {
+        @apply grid gap-3;
+    }
+
+    .restaurant-summary-card {
+        @apply rounded-2xl border p-4;
+        border-color: rgba(203, 213, 225, 0.78);
+        background: rgba(248, 250, 252, 0.82);
+    }
+
+    .restaurant-kitchen-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
+
+    .restaurant-kitchen-card {
+        border-radius: 1.55rem;
+    }
+
+    .restaurant-kitchen-card__header {
+        @apply flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
+    }
+
+    .restaurant-kitchen-card__meta {
+        @apply mt-4 grid gap-3 sm:grid-cols-3;
+    }
+
+    .restaurant-kitchen-meta-box {
+        @apply rounded-2xl border px-3 py-3;
+        border-color: rgba(203, 213, 225, 0.76);
+        background: rgba(248, 250, 252, 0.78);
+    }
+
+    .restaurant-kitchen-meta-box__label {
+        @apply text-[0.68rem] font-semibold uppercase tracking-[0.12em];
+        color: rgb(var(--base-content) / 0.45);
+    }
+
+    .restaurant-kitchen-meta-box__value {
+        @apply mt-2 text-sm font-semibold text-base-content;
+    }
+
+    .restaurant-kitchen-items {
+        @apply mt-5 grid gap-3;
+    }
+
+    .restaurant-kitchen-item {
+        @apply rounded-[1.2rem] border p-4;
+        border-color: rgba(203, 213, 225, 0.76);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+    }
+
+    .restaurant-kitchen-item__top {
+        @apply flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between;
+    }
+
+    .restaurant-kitchen-item__notes {
+        @apply mt-3 grid gap-2;
+    }
+
+    .restaurant-kitchen-note {
+        @apply rounded-xl border px-3 py-2 text-xs;
+        border-color: rgba(148, 163, 184, 0.28);
+        background: rgba(248, 250, 252, 0.86);
+        color: rgb(var(--base-content) / 0.68);
+    }
+
+    .restaurant-kitchen-item__form {
+        @apply mt-4 flex flex-col gap-2 sm:flex-row;
+    }
+
+    .restaurant-kitchen-board {
+        @apply grid gap-3 md:grid-cols-3;
+    }
+
+    .restaurant-kitchen-board__card {
+        @apply rounded-2xl border p-4;
+        border-color: rgba(203, 213, 225, 0.8);
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: 0 18px 34px -28px rgba(15, 23, 42, 0.42);
+    }
+
+    .restaurant-kitchen-board__eyebrow {
+        @apply text-[0.68rem] font-semibold uppercase tracking-[0.12em];
+        color: rgb(var(--base-content) / 0.45);
+    }
+
+    .restaurant-kitchen-board__value {
+        @apply mt-2 text-2xl font-semibold tracking-tight text-base-content;
+    }
+
+    @media (max-width: 1279px) {
+        .restaurant-side-panel {
+            position: static;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .restaurant-floor-kpis {
+            @apply grid-cols-2;
+        }
+
+        .restaurant-toolbar__filters .input {
+            min-width: 0;
+            width: 100%;
+        }
+
+        .restaurant-toolbar__filters {
+            @apply w-full;
+        }
+
+        .restaurant-toolbar__filters .select,
+        .restaurant-toolbar__filters .btn {
+            @apply flex-1;
+            min-width: 0;
+        }
+
+        .restaurant-table-order {
+            @apply flex-col items-stretch;
+        }
+
+        .restaurant-floor-grid {
+            grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+        }
+
+        .restaurant-map-card {
+            min-height: 0;
+        }
+
+        .restaurant-map-card__top,
+        .restaurant-map-card__order {
+            @apply flex-col items-start;
+        }
+
+        .restaurant-map-card__status {
+            white-space: normal;
+        }
+
+        .restaurant-order-products-grid,
+        .restaurant-kitchen-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .restaurant-order-toolbar__actions .input {
+            width: 100%;
+            min-width: 0;
+        }
+    }
+
     .form-grid {
         @apply grid gap-4 sm:grid-cols-2;
     }

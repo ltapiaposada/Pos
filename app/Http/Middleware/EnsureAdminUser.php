@@ -16,7 +16,7 @@ class EnsureAdminUser
             return redirect()->route('login');
         }
 
-        if ($user->hasAnyRole(['admin', 'supervisor', 'cashier'])) {
+        if ($user->hasAnyRole(['system_owner', 'admin', 'supervisor', 'cashier'])) {
             return $next($request);
         }
 

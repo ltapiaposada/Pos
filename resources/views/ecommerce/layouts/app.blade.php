@@ -12,6 +12,34 @@
             align-items: center;
             gap: .4rem;
         }
+        .shop-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: .75rem;
+            min-width: 0;
+        }
+        .shop-brand__copy {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            line-height: 1.15;
+        }
+        .shop-brand__eyebrow {
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+        .shop-brand__name {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #0f172a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: min(42vw, 320px);
+        }
         .shop-main {
             min-height: calc(100vh - 72px);
         }
@@ -77,6 +105,12 @@
         body.dark-mode .shop-nav .navbar-brand {
             color: #e2e8f0;
         }
+        body.dark-mode .shop-brand__eyebrow {
+            color: #94a3b8;
+        }
+        body.dark-mode .shop-brand__name {
+            color: #e2e8f0;
+        }
         body.dark-mode .shop-nav .btn-outline-secondary,
         body.dark-mode .shop-nav .btn-outline-primary {
             color: #e2e8f0;
@@ -123,12 +157,20 @@
 </head>
 <body class="bg-body-tertiary" data-theme="pos">
     @php
-        $business = \App\Models\Setting::getValue('business', []);
-        $businessName = $business['name'] ?? config('app.name', 'Tienda');
+        $publicCompany = \App\Support\CompanyContext::publicCompany();
+        $business = \App\Models\Setting::getValue('business', [], $publicCompany?->id);
+        $businessName = $business['name'] ?? $publicCompany?->name ?? config('app.name', 'Tienda');
+        $logoUrl = $business['logo_url'] ?? null;
     @endphp
     <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shop-nav">
         <div class="container">
-            <a class="navbar-brand fw-semibold" href="{{ route('shop.index') }}">{{ $businessName }}</a>
+            <a class="navbar-brand fw-semibold shop-brand" href="{{ route('shop.index') }}">
+                <x-application-logo :logo-url="$logoUrl" :size="38" class="rounded-circle border border-slate-200 bg-white p-1 shadow-sm flex-shrink-0" />
+                <span class="shop-brand__copy">
+                    <span class="shop-brand__eyebrow">Tienda oficial</span>
+                    <span class="shop-brand__name">{{ $businessName }}</span>
+                </span>
+            </a>
             <div class="d-flex align-items-center gap-2 ms-auto">
                 <button type="button" class="shop-theme-toggle" id="shop-theme-toggle" title="Cambiar tema" aria-label="Cambiar tema">
                     <i id="shop-theme-icon-sun" class="fa-regular fa-sun d-none"></i>

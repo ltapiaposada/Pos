@@ -24,10 +24,13 @@ class ProductKitItem extends Model
         'kit_product_id',
         'component_product_id',
         'quantity',
+        'component_unit',
+        'component_unit_factor',
     ];
 
     protected $casts = [
         'quantity' => 'decimal:3',
+        'component_unit_factor' => 'decimal:6',
     ];
 
     public function kitProduct()

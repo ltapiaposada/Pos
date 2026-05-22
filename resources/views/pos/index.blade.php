@@ -144,6 +144,7 @@
                                 <div class="card-body p-4 text-left">
                                     <div class="text-sm font-semibold" x-text="product.name"></div>
                                     <div class="text-xs text-base-content/60" x-text="product.sku"></div>
+                                    <div class="mt-1 text-[11px] text-base-content/60">Disponible: <span x-text="toAmount(product.available_stock).toFixed(3)"></span></div>
                                     <div class="mt-2 text-sm font-semibold text-primary">$<span x-text="product.sale_price"></span></div>
                                 </div>
                             </button>
@@ -183,7 +184,7 @@
                             <div class="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                                 <div>
                                     <label class="text-base-content/60">Cantidad</label>
-                                    <input type="number" step="0.001" min="0.001" x-model.number="item.quantity" class="input input-bordered input-sm sm:input-xs w-full">
+                                    <input type="number" step="0.001" min="0.001" x-model.number="item.quantity" @input="sanitizeItemQuantity(item)" class="input input-bordered input-sm sm:input-xs w-full">
                                 </div>
                                 <div>
                                     <label class="text-base-content/60">Precio</label>
@@ -193,6 +194,9 @@
                                     <label class="text-base-content/60">Desc %</label>
                                     <input type="number" step="0.01" min="0" x-model.number="item.discount_percent" class="input input-bordered input-sm sm:input-xs w-full">
                                 </div>
+                            </div>
+                            <div class="mt-2 text-[11px] text-base-content/60">
+                                Disponible: <span x-text="toAmount(item.available_stock).toFixed(3)"></span>
                             </div>
                         </div>
                     </template>
@@ -695,7 +699,7 @@
                         return;
                     }
                     try {
-                        const response = await fetch(`{{ route('pos.products.resolve') }}?${new URLSearchParams({ barcode }).toString()}`, {
+                        const response = await fetch(`{{ route('pos.products.resolve') }}?${new URLSearchParams({ barcode, branch_id: this.branchId || '' }).toString()}`, {
                             headers: { 'Accept': 'application/json' },
                         });
                         if (!response.ok) {
@@ -874,6 +878,7 @@
                 },
                 async fetchProducts() {
                     const params = new URLSearchParams({ q: this.search });
+                    params.set('branch_id', this.branchId || '');
                     const response = await fetch(`{{ route('pos.products') }}?${params.toString()}`);
                     this.products = await response.json();
                 },
@@ -883,7 +888,12 @@
                 addToCart(product) {
                     const existing = this.cart.find(item => item.product_id === product.id);
                     if (existing) {
-                        existing.quantity += 1;
+                        const nextQuantity = this.toAmount(existing.quantity) + 1;
+                        if (this.toAmount(existing.available_stock) > 0 && nextQuantity > this.toAmount(existing.available_stock)) {
+                            alert('No puedes vender una cantidad superior al stock disponible.');
+                            return;
+                        }
+                        existing.quantity = nextQuantity;
                         return;
                     }
                     this.cart.push({
@@ -894,7 +904,17 @@
                         unit_price: parseFloat(product.sale_price),
                         tax_rate: this.toAmount(product.tax_rate),
                         discount_percent: 0,
+                        available_stock: this.toAmount(product.available_stock),
                     });
+                },
+                sanitizeItemQuantity(item) {
+                    const quantity = Math.max(0.001, this.toAmount(item.quantity));
+                    const available = this.toAmount(item.available_stock);
+                    if (available > 0 && quantity > available) {
+                        item.quantity = available;
+                        return;
+                    }
+                    item.quantity = quantity;
                 },
                 removeItem(index) {
                     this.cart.splice(index, 1);
@@ -924,6 +944,10 @@
                     }
                     if (!this.customerId) {
                         alert('Debes seleccionar un cliente.');
+                        return;
+                    }
+                    if (this.cart.some(item => this.toAmount(item.available_stock) > 0 && this.toAmount(item.quantity) > this.toAmount(item.available_stock))) {
+                        alert('Hay productos con cantidad superior al stock disponible.');
                         return;
                     }
                     if (JSON.parse(this.paymentsPayload).length === 0) {

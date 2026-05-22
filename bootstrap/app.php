@@ -25,6 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'admin.user' => \App\Http\Middleware\EnsureAdminUser::class,
             'customer.user' => \App\Http\Middleware\EnsureCustomerUser::class,
+            'system.admin' => \App\Http\Middleware\EnsureSystemAdmin::class,
+            'active.subscription' => \App\Http\Middleware\EnsureActiveSubscription::class,
+            'pos.company' => \App\Http\Middleware\EnsurePosCompany::class,
+            'restaurant.company' => \App\Http\Middleware\EnsureRestaurantCompany::class,
+            'storefront.company' => \App\Http\Middleware\ResolveStorefrontCompany::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

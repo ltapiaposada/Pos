@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Branch;
 use App\Models\CashMovement;
 use App\Models\CashRegisterSession;
 use App\Models\Payment;
@@ -12,6 +13,7 @@ class CashRegisterService
 {
     public function open(int $branchId, int $userId, float $openingAmount): CashRegisterSession
     {
+        $companyId = Branch::withoutGlobalScopes()->whereKey($branchId)->value('company_id');
         $existing = CashRegisterSession::query()
             ->where('branch_id', $branchId)
             ->where('user_id', $userId)
@@ -25,6 +27,7 @@ class CashRegisterService
         }
 
         return CashRegisterSession::query()->create([
+            'company_id' => $companyId,
             'branch_id' => $branchId,
             'user_id' => $userId,
             'opened_at' => now(),
@@ -75,6 +78,7 @@ class CashRegisterService
         }
 
         return CashMovement::query()->create([
+            'company_id' => $session->company_id,
             'cash_register_session_id' => $session->id,
             'branch_id' => $session->branch_id,
             'user_id' => $userId,

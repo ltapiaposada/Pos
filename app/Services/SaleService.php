@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CashRegisterSession;
+use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\Product;
@@ -21,6 +22,7 @@ class SaleService
     {
         return DB::transaction(function () use ($payload, $userId) {
             $branchId = (int) $payload['branch_id'];
+            $companyId = Branch::withoutGlobalScopes()->whereKey($branchId)->value('company_id');
             $cashSession = CashRegisterSession::query()
                 ->where('branch_id', $branchId)
                 ->where('user_id', $userId)
@@ -55,6 +57,10 @@ class SaleService
 
                     return [$product->id];
                 })
+                ->merge(
+                    collect($items)
+                        ->flatMap(fn (array $item) => collect($item['inventory_components'] ?? [])->pluck('product_id'))
+                )
                 ->unique()
                 ->values();
 
@@ -117,10 +123,16 @@ class SaleService
                     'tax_rate' => $taxRate,
                     'tax_amount' => $taxAmount,
                     'line_total' => $lineTotal,
+                    'inventory_components' => $item['inventory_components'] ?? [],
                 ];
 
                 if (!$allowNegative) {
-                    $this->assertStockForLine($product, $quantity, $inventoriesByProduct);
+                    $this->assertStockForLine(
+                        product: $product,
+                        lineQuantity: $quantity,
+                        inventoriesByProduct: $inventoriesByProduct,
+                        extraComponents: $item['inventory_components'] ?? []
+                    );
                 }
             }
 
@@ -160,21 +172,22 @@ class SaleService
             $nextNumber = ((int) $lastNumber) + 1;
 
             $sale = Sale::query()->create([
+                'company_id' => $companyId,
                 'branch_id' => $branchId,
                 'user_id' => $userId,
                 'customer_id' => $payload['customer_id'] ?? null,
                 'cash_register_session_id' => $cashSession->id,
                 'sale_number' => $nextNumber,
                 'status' => $balanceTotal > 0 ? Sale::STATUS_PENDING : Sale::STATUS_PAID,
-                'order_source' => Sale::SOURCE_POS,
+                'order_source' => $payload['order_source'] ?? Sale::SOURCE_POS,
                 'subtotal' => $subtotal,
                 'discount_total' => $discountTotal,
                 'tax_total' => $taxTotal,
                 'shipping_total' => 0,
                 'coupon_discount_total' => 0,
                 'coupon_code' => null,
-                'delivery_address' => null,
-                'customer_note' => null,
+                'delivery_address' => $payload['delivery_address'] ?? null,
+                'customer_note' => $payload['customer_note'] ?? null,
                 'total' => $total,
                 'paid_total' => $paidTotal,
                 'change_total' => $changeTotal,
@@ -183,7 +196,10 @@ class SaleService
             ]);
 
             foreach ($lineItems as $line) {
+                $inventoryComponents = $line['inventory_components'] ?? [];
+                unset($line['inventory_components']);
                 $line['sale_id'] = $sale->id;
+                $line['company_id'] = $companyId;
                 SaleItem::query()->create($line);
 
                 $product = $products->get($line['product_id']);
@@ -192,12 +208,14 @@ class SaleService
                     branchId: $branchId,
                     userId: $userId,
                     saleId: $sale->id,
-                    lineQuantity: (float) $line['quantity']
+                    lineQuantity: (float) $line['quantity'],
+                    extraComponents: $inventoryComponents
                 );
             }
 
             foreach ($payments as $payment) {
                 Payment::query()->create([
+                    'company_id' => $companyId,
                     'sale_id' => $sale->id,
                     'method' => $payment['method'],
                     'amount' => $payment['amount'],
@@ -221,6 +239,7 @@ class SaleService
                 $notes = 'Venta Punto de venta - efectivo';
 
                 \App\Models\CashMovement::query()->create([
+                    'company_id' => $companyId,
                     'cash_register_session_id' => $cashSession->id,
                     'branch_id' => $branchId,
                     'user_id' => $userId,
@@ -234,8 +253,63 @@ class SaleService
         });
     }
 
-    private function assertStockForLine(Product $product, float $lineQuantity, Collection $inventoriesByProduct): void
+    private function assertStockForLine(Product $product, float $lineQuantity, Collection $inventoriesByProduct, array $extraComponents = []): void
     {
+        $requiredByProduct = $this->resolveInventoryRequirementsForLine($product, $lineQuantity, $extraComponents);
+
+        foreach ($requiredByProduct as $productId => $required) {
+            if ($required <= 0) {
+                continue;
+            }
+
+            $componentStock = (float) ($inventoriesByProduct->get($productId)->stock ?? 0);
+            if ($componentStock - $required < 0) {
+                $componentName = $productId === $product->id
+                    ? $product->name
+                    : (Product::query()->find($productId)?->name ?? 'componente');
+
+                throw ValidationException::withMessages([
+                    'items' => "Stock insuficiente para {$componentName}.",
+                ]);
+            }
+        }
+    }
+
+    private function applyInventoryMovementsForSaleLine(Product $product, int $branchId, int $userId, int $saleId, float $lineQuantity, array $extraComponents = []): void
+    {
+        $inventoryService = app(InventoryService::class);
+        $requiredByProduct = $this->resolveInventoryRequirementsForLine($product, $lineQuantity, $extraComponents);
+
+        foreach ($requiredByProduct as $productId => $required) {
+            if ($required <= 0) {
+                continue;
+            }
+
+            $component = $productId === $product->id ? $product : Product::query()->find($productId);
+            if (! $component) {
+                continue;
+            }
+
+            $inventoryService->adjust([
+                'branch_id' => $branchId,
+                'product_id' => $component->id,
+                'user_id' => $userId,
+                'type' => 'OUT',
+                'quantity' => $required,
+                'cost_price' => $component->cost_price ?? 0,
+                'ref_type' => 'sale',
+                'ref_id' => $saleId,
+                'notes' => $product->product_type === Product::TYPE_KIT
+                    ? "Venta Punto de venta (kit {$product->sku})"
+                    : "Venta Punto de venta ({$product->sku})",
+            ]);
+        }
+    }
+
+    private function resolveInventoryRequirementsForLine(Product $product, float $lineQuantity, array $extraComponents = []): array
+    {
+        $requirements = [];
+
         if ($product->product_type === Product::TYPE_KIT) {
             if ($product->kitItems->isEmpty()) {
                 throw ValidationException::withMessages([
@@ -244,65 +318,26 @@ class SaleService
             }
 
             foreach ($product->kitItems as $kitItem) {
-                $required = (float) $kitItem->quantity * $lineQuantity;
-                $componentStock = (float) ($inventoriesByProduct->get($kitItem->component_product_id)->stock ?? 0);
+                $requirements[$kitItem->component_product_id] = ($requirements[$kitItem->component_product_id] ?? 0)
+                    + (((float) $kitItem->quantity * (float) ($kitItem->component_unit_factor ?? 1)) * $lineQuantity);
+            }
+        } else {
+            $requirements[$product->id] = ($requirements[$product->id] ?? 0) + $lineQuantity;
+        }
 
-                if ($componentStock - $required < 0) {
-                    $componentName = $kitItem->componentProduct?->name ?? 'componente';
-                    throw ValidationException::withMessages([
-                        'items' => "Stock insuficiente para {$componentName} (kit {$product->name}).",
-                    ]);
-                }
+        foreach ($extraComponents as $component) {
+            $componentProductId = (int) ($component['product_id'] ?? 0);
+            $componentQuantity = (float) ($component['stock_quantity'] ?? 0) * $lineQuantity;
+            if ($componentProductId <= 0 || $componentQuantity === 0.0) {
+                continue;
             }
 
-            return;
+            $sign = ($component['selection_action'] ?? 'include') === 'remove' ? -1 : 1;
+            $requirements[$componentProductId] = ($requirements[$componentProductId] ?? 0) + ($componentQuantity * $sign);
         }
 
-        $stock = (float) ($inventoriesByProduct->get($product->id)->stock ?? 0);
-        if ($stock - $lineQuantity < 0) {
-            throw ValidationException::withMessages([
-                'items' => "Stock insuficiente para {$product->name}.",
-            ]);
-        }
-    }
-
-    private function applyInventoryMovementsForSaleLine(Product $product, int $branchId, int $userId, int $saleId, float $lineQuantity): void
-    {
-        $inventoryService = app(InventoryService::class);
-
-        if ($product->product_type === Product::TYPE_KIT) {
-            foreach ($product->kitItems as $kitItem) {
-                $component = $kitItem->componentProduct;
-                if (! $component) {
-                    continue;
-                }
-
-                $inventoryService->adjust([
-                    'branch_id' => $branchId,
-                    'product_id' => $component->id,
-                    'user_id' => $userId,
-                    'type' => 'OUT',
-                    'quantity' => (float) $kitItem->quantity * $lineQuantity,
-                    'cost_price' => $component->cost_price ?? 0,
-                    'ref_type' => 'sale',
-                    'ref_id' => $saleId,
-                    'notes' => "Venta Punto de venta (kit {$product->sku})",
-                ]);
-            }
-
-            return;
-        }
-
-        $inventoryService->adjust([
-            'branch_id' => $branchId,
-            'product_id' => $product->id,
-            'user_id' => $userId,
-            'type' => 'OUT',
-            'quantity' => $lineQuantity,
-            'cost_price' => $product->cost_price ?? 0,
-            'ref_type' => 'sale',
-            'ref_id' => $saleId,
-            'notes' => 'Venta Punto de venta',
-        ]);
+        return collect($requirements)
+            ->map(fn (float $required) => max(0, round($required, 6)))
+            ->all();
     }
 }

@@ -76,7 +76,7 @@ class SaleFlowTest extends TestCase
             'payments' => json_encode([
                 [
                     'method' => 'cash',
-                    'amount' => 3.00,
+                    'amount' => 2.78,
                 ],
             ]),
         ];
@@ -201,7 +201,7 @@ class SaleFlowTest extends TestCase
                 ],
                 [
                     'method' => 'credit',
-                    'amount' => 10.00,
+                    'amount' => 1.78,
                 ],
             ],
         ]);
@@ -223,5 +223,95 @@ class SaleFlowTest extends TestCase
 
         $this->assertNotNull($receivableLine);
         $this->assertEquals(round((float) $sale->total - 1.00, 2), round((float) $receivableLine->debit, 2));
+    }
+
+    public function test_pos_products_endpoint_only_returns_products_with_available_stock(): void
+    {
+        $this->seed();
+        $user = User::where('email', 'cashier@pos.test')->firstOrFail();
+
+        $soldOut = Product::create([
+            'name' => 'Agotado POS',
+            'sku' => 'AGOTADO-POS',
+            'unit' => 'unit',
+            'product_type' => Product::TYPE_SIMPLE,
+            'cost_price' => 1,
+            'sale_price' => 2,
+            'is_active' => true,
+        ]);
+
+        $rawChicken = Product::create([
+            'name' => 'Pollo crudo',
+            'sku' => 'POLLO-CRUDO',
+            'unit' => 'kg',
+            'product_type' => Product::TYPE_SIMPLE,
+            'cost_price' => 10,
+            'sale_price' => 12,
+            'is_active' => true,
+        ]);
+
+        $dish = Product::create([
+            'name' => 'Plato de pollo 250g',
+            'sku' => 'PLATO-POLLO-250',
+            'unit' => 'plato',
+            'product_type' => Product::TYPE_KIT,
+            'cost_price' => 0,
+            'sale_price' => 18,
+            'is_active' => true,
+        ]);
+
+        ProductKitItem::create([
+            'kit_product_id' => $dish->id,
+            'component_product_id' => $rawChicken->id,
+            'quantity' => 250,
+            'component_unit' => 'g',
+            'component_unit_factor' => 0.001,
+        ]);
+
+        Inventory::updateOrCreate(
+            ['branch_id' => $user->branch_id, 'product_id' => $rawChicken->id],
+            ['stock' => 1, 'min_stock' => 0]
+        );
+
+        Inventory::updateOrCreate(
+            ['branch_id' => $user->branch_id, 'product_id' => $soldOut->id],
+            ['stock' => 0, 'min_stock' => 0]
+        );
+
+        $response = $this->actingAs($user)->getJson(route('pos.products', [
+            'branch_id' => $user->branch_id,
+            'q' => 'PLATO',
+        ]));
+
+        $response->assertOk()
+            ->assertJsonFragment([
+                'id' => $dish->id,
+                'name' => 'Plato de pollo 250g',
+                'available_stock' => 4.0,
+            ]);
+
+        $response->assertJsonMissing([
+            'id' => $soldOut->id,
+        ]);
+    }
+
+    public function test_inventory_adjustment_cannot_remove_more_than_available_stock(): void
+    {
+        $this->seed();
+        $user = User::where('email', 'admin@pos.test')->firstOrFail();
+
+        Inventory::updateOrCreate(
+            ['branch_id' => $user->branch_id, 'product_id' => 1],
+            ['stock' => 2, 'min_stock' => 0]
+        );
+
+        $response = $this->actingAs($user)->post(route('inventory.adjust'), [
+            'branch_id' => $user->branch_id,
+            'product_id' => 1,
+            'type' => 'OUT',
+            'quantity' => 3,
+        ]);
+
+        $response->assertSessionHasErrors('quantity');
     }
 }

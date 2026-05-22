@@ -44,6 +44,14 @@
             transform: scale(1.03);
             box-shadow: 0 12px 24px rgba(15, 23, 42, .12);
         }
+        .restaurant-order-note {
+            border: 1px solid #bfdbfe;
+            border-radius: .9rem;
+            background: #f8fbff;
+            padding: .85rem 1rem;
+            color: #1e3a8a;
+            font-size: .92rem;
+        }
         .qr-lightbox {
             position: fixed;
             inset: 0;
@@ -128,6 +136,11 @@
             border-color: rgba(100, 116, 139, .55);
             background: #0f172a;
         }
+        body.dark-mode .restaurant-order-note {
+            border-color: rgba(59, 130, 246, .42);
+            background: rgba(30, 58, 138, .22);
+            color: #bfdbfe;
+        }
         body.dark-mode .qr-lightbox__dialog {
             background: #0f172a;
             box-shadow: 0 24px 60px rgba(2, 6, 23, .55);
@@ -158,6 +171,13 @@
                 <div class="card-body">
                     <form method="POST" action="{{ route('shop.place-order') }}" class="row g-3">
                         @csrf
+                        @if ($isRestaurantCatalog)
+                            <div class="col-12">
+                                <div class="restaurant-order-note">
+                                    Este pedido entrar&aacute; al flujo normal del restaurante: cocina, preparaci&oacute;n y cierre posterior en caja.
+                                </div>
+                            </div>
+                        @endif
                         <div class="col-md-6">
                             <label class="form-label">Nombre</label>
                             <input type="text" class="form-control" value="{{ auth()->user()->name }}" disabled>
@@ -170,8 +190,17 @@
                             <label for="phone" class="form-label">Telefono</label>
                             <input type="text" id="phone" name="phone" class="form-control" value="{{ old('phone', $customer->phone) }}">
                         </div>
+                        @if ($isRestaurantCatalog)
+                            <div class="col-md-6">
+                                <label for="fulfillment_type" class="form-label">Tipo de pedido</label>
+                                <select id="fulfillment_type" name="fulfillment_type" class="form-select">
+                                    <option value="delivery" @selected(old('fulfillment_type', 'delivery') === 'delivery')>Domicilio</option>
+                                    <option value="takeaway" @selected(old('fulfillment_type') === 'takeaway')>Para llevar</option>
+                                </select>
+                            </div>
+                        @endif
                         <div class="col-12">
-                            <label for="address" class="form-label">Direccion de entrega</label>
+                            <label for="address" class="form-label">{{ $isRestaurantCatalog ? 'Direccion de entrega' : 'Direccion de entrega' }}</label>
                             <input type="text" id="address" name="address" class="form-control" required value="{{ old('address', $customer->address) }}">
                         </div>
                         <div class="col-md-6">
@@ -230,7 +259,16 @@
                     <ul class="list-group list-group-flush mb-3">
                         @foreach ($cartItems as $item)
                             <li class="list-group-item d-flex justify-content-between px-0">
-                                <span>{{ $item['product']->name }} x {{ $item['quantity'] }}</span>
+                                <span>
+                                    {{ $item['display_name'] }} x {{ $item['quantity'] }}
+                                    @if (! empty($item['selection_summary']))
+                                        <span class="d-block small text-muted mt-1">
+                                            @foreach ($item['selection_summary'] as $selectionLine)
+                                                <span class="d-block">{{ $selectionLine['group'] }}: {{ implode(', ', $selectionLine['labels']) }}</span>
+                                            @endforeach
+                                        </span>
+                                    @endif
+                                </span>
                                 <span>${{ number_format($item['total'], 2) }}</span>
                             </li>
                         @endforeach
@@ -255,9 +293,11 @@
     <script>
         (function () {
             const methodSelect = document.getElementById('payment_method');
+            const fulfillmentSelect = document.getElementById('fulfillment_type');
             const qrWrapper = document.getElementById('payment-qr-wrapper');
             const paymentReferenceWrapper = document.getElementById('payment-reference-wrapper');
             const paymentReferenceInput = document.getElementById('payment_reference');
+            const addressInput = document.getElementById('address');
             if (!methodSelect || !paymentReferenceWrapper || !paymentReferenceInput) {
                 return;
             }
@@ -280,6 +320,24 @@
 
             methodSelect.addEventListener('change', togglePaymentBlocks);
             togglePaymentBlocks();
+
+            function toggleFulfillmentBlocks() {
+                if (!fulfillmentSelect || !addressInput) {
+                    return;
+                }
+
+                const isTakeaway = fulfillmentSelect.value === 'takeaway';
+                addressInput.required = !isTakeaway;
+                addressInput.closest('.col-12')?.classList.toggle('opacity-50', isTakeaway);
+                addressInput.placeholder = isTakeaway ? 'No requerida para pedidos para llevar' : 'Direccion de entrega';
+
+                if (isTakeaway) {
+                    addressInput.value = '';
+                }
+            }
+
+            fulfillmentSelect?.addEventListener('change', toggleFulfillmentBlocks);
+            toggleFulfillmentBlocks();
         })();
 
         (function () {

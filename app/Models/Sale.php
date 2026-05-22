@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompanyThroughBranch;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
 {
     use HasFactory;
+    use BelongsToCompanyThroughBranch;
 
     public const STATUS_PAID = 'paid';
     public const STATUS_PENDING = 'pending';
@@ -18,8 +20,10 @@ class Sale extends Model
 
     public const SOURCE_POS = 'pos';
     public const SOURCE_ECOMMERCE = 'ecommerce';
+    public const SOURCE_RESTAURANT = 'restaurant';
 
     protected $fillable = [
+        'company_id',
         'branch_id',
         'user_id',
         'customer_id',
@@ -65,6 +69,11 @@ class Sale extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -83,6 +92,11 @@ class Sale extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function restaurantOrder()
+    {
+        return $this->hasOne(RestaurantOrder::class);
     }
 
     public function invoicedBy()

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CompanyRules;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CategoryRequest extends FormRequest
@@ -16,7 +17,7 @@ class CategoryRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:255'],
-            'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'parent_id' => ['nullable', 'integer', CompanyRules::companyScoped('categories')],
         ];
     }
 }

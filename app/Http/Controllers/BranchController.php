@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\BranchRequest;
 use App\Models\Branch;
+use App\Support\CompanyContext;
 
 class BranchController extends Controller
 {
@@ -21,7 +22,10 @@ class BranchController extends Controller
 
     public function store(BranchRequest $request)
     {
-        Branch::query()->create($request->validated());
+        Branch::query()->create([
+            ...$request->validated(),
+            'company_id' => CompanyContext::authenticatedCompanyId(),
+        ]);
 
         return redirect()->route('branches.index')->with('status', 'Sucursal creada.');
     }

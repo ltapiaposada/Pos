@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Company;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -9,9 +10,12 @@ class BranchSeeder extends Seeder
 {
     public function run(): void
     {
+        $companyId = Company::query()->value('id');
+
         DB::table('branches')->insert([
             [
                 'id' => 1,
+                'company_id' => $companyId,
                 'name' => 'Sucursal Centro',
                 'code' => 'CTR',
                 'address' => 'Calle Principal 123',
@@ -21,6 +25,7 @@ class BranchSeeder extends Seeder
             ],
             [
                 'id' => 2,
+                'company_id' => $companyId,
                 'name' => 'Sucursal Norte',
                 'code' => 'NTE',
                 'address' => 'Av. Norte 456',

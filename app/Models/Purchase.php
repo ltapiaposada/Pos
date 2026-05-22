@@ -2,16 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompanyThroughBranch;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Purchase extends Model
 {
     use HasFactory;
+    use BelongsToCompanyThroughBranch;
 
     public const STATUS_POSTED = 'posted';
 
     protected $fillable = [
+        'company_id',
         'branch_id',
         'user_id',
         'purchase_number',
@@ -41,6 +44,11 @@ class Purchase extends Model
     public function branch()
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function user()

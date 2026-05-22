@@ -116,6 +116,15 @@
             overflow-wrap: anywhere;
             line-height: 1.2;
         }
+        .cart-product-modifiers {
+            margin-top: .45rem;
+            display: grid;
+            gap: .2rem;
+        }
+        .cart-product-modifier {
+            font-size: .78rem;
+            color: #64748b;
+        }
         .cart-qty-input {
             width: 112px;
             min-width: 112px;
@@ -195,6 +204,9 @@
             color: #e2e8f0;
             border-color: rgba(71, 85, 105, .5);
         }
+        body.dark-mode .cart-product-modifier {
+            color: #94a3b8;
+        }
     </style>
 
     <section class="shop-mini-hero">
@@ -219,18 +231,27 @@
                             <article class="border rounded-3 p-3 mb-3">
                                 <div class="d-flex align-items-center gap-2">
                                     <img src="{{ $item['product']->image_url ?: asset('images/product-placeholder.svg') }}" alt="{{ $item['product']->name }}" class="cart-product-image">
-                                    <div class="fw-semibold">{{ $item['product']->name }}</div>
+                                    <div>
+                                        <div class="fw-semibold">{{ $item['display_name'] }}</div>
+                                        @if (! empty($item['selection_summary']))
+                                            <div class="cart-product-modifiers">
+                                                @foreach ($item['selection_summary'] as $selectionLine)
+                                                    <div class="cart-product-modifier">{{ $selectionLine['group'] }}: {{ implode(', ', $selectionLine['labels']) }}</div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
                                 <div class="small mt-2">Precio: ${{ number_format($item['unit_price'], 2) }}</div>
                                 <div class="small">Impuesto: ${{ number_format($item['tax'], 2) }}</div>
                                 <div class="small">Total: ${{ number_format($item['total'], 2) }}</div>
-                                <form method="POST" action="{{ route('shop.cart.update', $item['product']) }}" class="mt-2 d-grid gap-2">
+                                <form method="POST" action="{{ route('shop.cart.update', $item['line_key']) }}" class="mt-2 d-grid gap-2">
                                     @csrf
                                     @method('PATCH')
                                     <input type="number" name="quantity" min="1" max="999" value="{{ $item['quantity'] }}" class="form-control form-control-sm">
                                     <button class="btn btn-outline-secondary btn-sm">Actualizar cantidad</button>
                                 </form>
-                                <form method="POST" action="{{ route('shop.cart.remove', $item['product']) }}" class="mt-2">
+                                <form method="POST" action="{{ route('shop.cart.remove', $item['line_key']) }}" class="mt-2">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-outline-danger btn-sm w-100">Quitar</button>
@@ -258,12 +279,21 @@
                                         <td class="cart-product-cell">
                                             <div class="cart-product-wrap">
                                                 <img src="{{ $item['product']->image_url ?: asset('images/product-placeholder.svg') }}" alt="{{ $item['product']->name }}" class="cart-product-image">
-                                                <span class="cart-product-name">{{ $item['product']->name }}</span>
+                                                <span class="cart-product-name">
+                                                    {{ $item['display_name'] }}
+                                                    @if (! empty($item['selection_summary']))
+                                                        <span class="cart-product-modifiers">
+                                                            @foreach ($item['selection_summary'] as $selectionLine)
+                                                                <span class="cart-product-modifier">{{ $selectionLine['group'] }}: {{ implode(', ', $selectionLine['labels']) }}</span>
+                                                            @endforeach
+                                                        </span>
+                                                    @endif
+                                                </span>
                                             </div>
                                         </td>
                                         <td>${{ number_format($item['unit_price'], 2) }}</td>
                                         <td>
-                                            <form method="POST" action="{{ route('shop.cart.update', $item['product']) }}" class="cart-qty-form">
+                                            <form method="POST" action="{{ route('shop.cart.update', $item['line_key']) }}" class="cart-qty-form">
                                                 @csrf
                                                 @method('PATCH')
                                                 <input type="number" name="quantity" min="1" max="999" value="{{ $item['quantity'] }}" class="form-control form-control-sm cart-qty-input">
@@ -274,7 +304,7 @@
                                         <td>${{ number_format($item['tax'], 2) }}</td>
                                         <td>${{ number_format($item['total'], 2) }}</td>
                                         <td>
-                                            <form method="POST" action="{{ route('shop.cart.remove', $item['product']) }}">
+                                            <form method="POST" action="{{ route('shop.cart.remove', $item['line_key']) }}">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button class="btn btn-outline-danger btn-sm">Quitar</button>

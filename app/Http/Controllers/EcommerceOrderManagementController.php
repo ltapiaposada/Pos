@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\RestaurantOrder;
 use App\Models\Sale;
 use App\Services\AccountingPostingService;
 use Illuminate\Support\Facades\DB;
@@ -13,13 +14,39 @@ class EcommerceOrderManagementController extends Controller
 {
     public function index(Request $request): View
     {
+        $search = (string) $request->get('q', '');
+        $status = (string) $request->get('status', '');
+
+        $restaurantOrders = RestaurantOrder::query()
+            ->with(['customer', 'branch', 'table'])
+            ->where(function ($query) {
+                $query->where('notes', 'like', 'Origen: Pedido web restaurante%')
+                    ->orWhereIn('order_type', [
+                        RestaurantOrder::TYPE_DELIVERY,
+                        RestaurantOrder::TYPE_TAKEAWAY,
+                    ]);
+            })
+            ->whereNull('sale_id')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('order_number', 'like', "%{$search}%")
+                        ->orWhereHas('customer', fn ($q) => $q->where('name', 'like', "%{$search}%"))
+                        ->orWhere('notes', 'like', "%{$search}%");
+                });
+            })
+            ->when($status !== '' && array_key_exists($status, RestaurantOrder::statusOptions()), fn ($query) => $query->where('status', $status))
+            ->orderByDesc('opened_at')
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get();
+
         $query = Sale::query()
             ->with(['customer', 'branch', 'payments'])
             ->where('order_source', Sale::SOURCE_ECOMMERCE)
             ->orderByDesc('sold_at')
             ->orderByDesc('id');
 
-        if ($search = $request->get('q')) {
+        if ($search !== '') {
             $query->where(function ($builder) use ($search) {
                 $builder->where('sale_number', 'like', "%{$search}%")
                     ->orWhereHas('customer', fn ($q) => $q->where('name', 'like', "%{$search}%"))
@@ -27,7 +54,7 @@ class EcommerceOrderManagementController extends Controller
             });
         }
 
-        if ($status = $request->get('status')) {
+        if ($status !== '' && array_key_exists($status, $this->saleStatusOptions())) {
             $query->where('status', $status);
         }
 
@@ -35,7 +62,10 @@ class EcommerceOrderManagementController extends Controller
 
         return view('ecommerce_admin.orders.index', [
             'orders' => $orders,
+            'restaurantOrders' => $restaurantOrders,
             'statusOptions' => $this->statusOptions(),
+            'saleStatusOptions' => $this->saleStatusOptions(),
+            'restaurantStatusOptions' => RestaurantOrder::statusOptions(),
         ]);
     }
 
@@ -103,6 +133,11 @@ class EcommerceOrderManagementController extends Controller
     }
 
     private function statusOptions(): array
+    {
+        return $this->saleStatusOptions() + RestaurantOrder::statusOptions();
+    }
+
+    private function saleStatusOptions(): array
     {
         return [
             Sale::STATUS_PENDING => 'Pendiente',

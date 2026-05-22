@@ -20,6 +20,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'company_id',
         'branch_id',
         'name',
         'email',
@@ -54,6 +55,11 @@ class User extends Authenticatable
         return $this->belongsTo(Branch::class);
     }
 
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
     public function customerProfile()
     {
         return $this->hasOne(Customer::class);
@@ -62,5 +68,10 @@ class User extends Authenticatable
     public function purchases()
     {
         return $this->hasMany(Purchase::class);
+    }
+
+    public function isSystemAdmin(): bool
+    {
+        return $this->hasRole('system_owner');
     }
 }

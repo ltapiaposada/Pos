@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -10,10 +11,13 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        $companyId = Company::query()->value('id');
+
         $admin = User::firstOrCreate(
             ['email' => 'admin@pos.test'],
             [
                 'name' => 'Admin POS',
+                'company_id' => $companyId,
                 'password' => Hash::make('password'),
                 'branch_id' => 1,
             ]
@@ -24,6 +28,7 @@ class UserSeeder extends Seeder
             ['email' => 'supervisor@pos.test'],
             [
                 'name' => 'Supervisor POS',
+                'company_id' => $companyId,
                 'password' => Hash::make('password'),
                 'branch_id' => 1,
             ]
@@ -34,6 +39,7 @@ class UserSeeder extends Seeder
             ['email' => 'cashier@pos.test'],
             [
                 'name' => 'Cajero POS',
+                'company_id' => $companyId,
                 'password' => Hash::make('password'),
                 'branch_id' => 1,
             ]

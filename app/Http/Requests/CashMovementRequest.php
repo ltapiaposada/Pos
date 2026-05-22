@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CompanyRules;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CashMovementRequest extends FormRequest
@@ -14,7 +15,7 @@ class CashMovementRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'branch_id' => ['required', 'integer', CompanyRules::companyScoped('branches')],
             'type' => ['required', 'in:IN,OUT'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'reason' => ['required', 'string', 'max:255'],

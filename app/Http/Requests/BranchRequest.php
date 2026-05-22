@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,10 +16,13 @@ class BranchRequest extends FormRequest
     public function rules(): array
     {
         $branchId = $this->route('branch')?->id;
+        $companyId = CompanyContext::authenticatedCompanyId();
 
         return [
             'name' => ['required', 'string', 'max:120'],
-            'code' => ['required', 'string', 'max:20', Rule::unique('branches', 'code')->ignore($branchId)],
+            'code' => ['required', 'string', 'max:20', Rule::unique('branches', 'code')
+                ->where(fn ($query) => $query->where('company_id', $companyId))
+                ->ignore($branchId)],
             'address' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
         ];

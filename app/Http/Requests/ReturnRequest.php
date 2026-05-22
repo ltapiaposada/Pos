@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CompanyRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -15,10 +16,10 @@ class ReturnRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'sale_id' => ['required', 'integer', 'exists:sales,id'],
+            'sale_id' => ['required', 'integer', CompanyRules::branchScoped('sales')],
             'reason' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', CompanyRules::companyScoped('products')],
             'items.*.quantity' => ['required', 'numeric', 'min:0'],
         ];
     }

@@ -114,26 +114,27 @@
                         </div>
                         <div>
                             <label class="field-label">Producto</label>
-                            <select name="product_id" class="select select-bordered w-full">
+                            <select name="product_id" id="inventory-product" class="select select-bordered w-full">
                                 @foreach ($products as $product)
-                                    <option value="{{ $product->id }}">{{ $product->name }}</option>
+                                    <option value="{{ $product->id }}" data-stock="{{ number_format((float) ($product->current_stock ?? 0), 3, '.', '') }}">{{ $product->name }}</option>
                                 @endforeach
                             </select>
                             @error('product_id')
                                 <p class="text-xs text-error mt-1">{{ $message }}</p>
                             @enderror
+                            <p class="mt-1 text-xs text-base-content/60">Stock actual: <span id="inventory-current-stock">0.000</span></p>
                         </div>
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <label class="field-label">Tipo</label>
-                                <select name="type" class="select select-bordered w-full">
+                                <select name="type" id="inventory-type" class="select select-bordered w-full">
                                     <option value="IN">Entrada</option>
                                     <option value="OUT">Salida</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="field-label">Cantidad</label>
-                                <input name="quantity" type="number" step="0.001" class="input input-bordered w-full" required>
+                                <input name="quantity" id="inventory-quantity" type="number" step="0.001" min="0.001" class="input input-bordered w-full" required>
                                 @error('quantity')
                                     <p class="text-xs text-error mt-1">{{ $message }}</p>
                                 @enderror
@@ -183,4 +184,33 @@
             </div>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const productSelect = document.getElementById('inventory-product');
+            const typeSelect = document.getElementById('inventory-type');
+            const quantityInput = document.getElementById('inventory-quantity');
+            const stockLabel = document.getElementById('inventory-current-stock');
+
+            if (!productSelect || !typeSelect || !quantityInput || !stockLabel) {
+                return;
+            }
+
+            function syncInventoryLimits() {
+                const selected = productSelect.options[productSelect.selectedIndex];
+                const stock = Number(selected?.dataset.stock || 0);
+                stockLabel.textContent = stock.toFixed(3);
+
+                if (typeSelect.value === 'OUT') {
+                    quantityInput.max = stock > 0 ? String(stock) : '0';
+                } else {
+                    quantityInput.removeAttribute('max');
+                }
+            }
+
+            productSelect.addEventListener('change', syncInventoryLimits);
+            typeSelect.addEventListener('change', syncInventoryLimits);
+            syncInventoryLimits();
+        })();
+    </script>
 @endsection

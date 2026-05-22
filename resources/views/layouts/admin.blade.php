@@ -20,6 +20,12 @@
             $logoUrl = $business['logo_url'] ?? null;
             $businessName = $business['name'] ?? config('app.name', 'Punto de venta');
             $user = Auth::user();
+            $companyTypeSlug = \App\Support\CompanyContext::activeSubscriptionPlanType($user?->company);
+            $isRestaurantCompany = $companyTypeSlug === 'restaurant';
+            $subscriptionModeLabel = $companyTypeSlug === 'restaurant' ? 'Restaurante' : ($companyTypeSlug === 'pos' ? 'POS' : ucfirst((string) $companyTypeSlug));
+            $canSwitchSubscriptionContext = $user
+                ? app(\App\Services\SubscriptionAccessService::class)->hasMultiplePaidActivePlanContexts($user->company)
+                : false;
             $initial = strtoupper(substr($user->name ?? 'U', 0, 1));
             $lowStockQuery = \App\Models\Inventory::query()
                 ->with(['product:id,name,sku', 'branch:id,name'])
@@ -62,7 +68,7 @@
 
                     <ul class="navbar-nav ms-auto align-items-center gap-2">
                         <li class="nav-item d-none d-md-block">
-                            <span class="badge text-bg-light border">Panel administrativo</span>
+                            <span class="badge text-bg-light border">Panel {{ $subscriptionModeLabel }}</span>
                         </li>
                         <li class="nav-item dropdown">
                             <a href="#" class="nav-link position-relative px-2" data-bs-toggle="dropdown" aria-label="Alertas de inventario">
@@ -119,6 +125,14 @@
                                         <span>Mi perfil</span>
                                     </a>
                                 </li>
+                                @if ($canSwitchSubscriptionContext)
+                                    <li>
+                                        <a href="{{ route('subscription-context.index') }}" class="dropdown-item user-menu-item d-flex align-items-center gap-2">
+                                            <i class="fa-solid fa-shuffle"></i>
+                                            <span>Cambiar contexto</span>
+                                        </a>
+                                    </li>
+                                @endif
                                 <li>
                                     <form method="POST" action="{{ route('logout') }}">
                                         @csrf
@@ -146,10 +160,10 @@
                     <nav class="mt-2">
                         <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
                             @php
-                                $salesMenuOpen = request()->routeIs('pos.*') || request()->routeIs('sales.*') || request()->routeIs('cash-register.*') || request()->routeIs('returns.*') || request()->routeIs('purchases.*');
+                                $salesMenuOpen = request()->routeIs('pos.*') || request()->routeIs('sales.*') || request()->routeIs('cash-register.*') || request()->routeIs('returns.*') || request()->routeIs('purchases.*') || request()->routeIs('restaurant.*');
                                 $catalogMenuOpen = request()->is('products*') || request()->is('categories*') || request()->is('customers*') || request()->is('branches*');
                                 $opsMenuOpen = request()->is('inventory*') || request()->routeIs('reports.*');
-                                $securityMenuOpen = request()->is('security/users*') || request()->is('security/roles*') || request()->is('settings*');
+                                $securityMenuOpen = request()->is('security/users*') || request()->is('security/roles*') || request()->is('settings*') || request()->routeIs('admin.implementation-progress') || request()->routeIs('system.companies.*');
                                 $accountingMenuOpen = request()->is('accounting/accounts*') || request()->is('accounting/expenses*') || request()->is('accounting/receivables*') || request()->is('accounting/payables*') || request()->is('accounting/opening-balances*') || request()->is('accounting/entries*') || request()->is('accounting/income-statement*') || request()->is('accounting/close-period*');
                                 $ecommerceMenuOpen = request()->is('ecommerce/orders*');
                             @endphp
@@ -162,24 +176,26 @@
                                 </a>
                             </li>
 
-                            @canany(['create_sale', 'open_cash_register', 'process_return', 'manage_purchases'])
+                            @canany(['create_sale', 'open_cash_register', 'process_return', 'manage_purchases', 'manage_restaurant', 'manage_restaurant_kitchen'])
                                 <li class="nav-header">FLUJO DIARIO</li>
                                 <li class="nav-item has-treeview {{ $salesMenuOpen ? 'menu-open' : '' }}">
                                     <a href="#" class="nav-link {{ $salesMenuOpen ? 'active' : '' }}">
                                         <i class="nav-icon fa-solid fa-cart-shopping"></i>
                                         <p>
-                                            Ventas y caja
+                                            {{ $isRestaurantCompany ? 'Restaurante y caja' : 'Ventas y caja' }}
                                             <i class="nav-arrow fa-solid fa-angle-right right"></i>
                                         </p>
                                     </a>
                                     <ul class="nav nav-treeview">
                                         @can('create_sale')
+                                            @if (! $isRestaurantCompany)
                                             <li class="nav-item">
                                                 <a href="{{ route('pos.index') }}" class="nav-link {{ request()->routeIs('pos.*') ? 'active' : '' }}">
                                                     <i class="nav-icon fa-regular fa-circle"></i>
                                                     <p>Punto de venta</p>
                                                 </a>
                                             </li>
+                                            @endif
                                             <li class="nav-item">
                                                 <a href="{{ route('sales.index') }}" class="nav-link {{ request()->routeIs('sales.*') ? 'active' : '' }}">
                                                     <i class="nav-icon fa-regular fa-circle"></i>
@@ -187,6 +203,30 @@
                                                 </a>
                                             </li>
                                         @endcan
+                                        @if ($isRestaurantCompany)
+                                        @can('manage_restaurant')
+                                            <li class="nav-item">
+                                                <a href="{{ route('restaurant.index') }}" class="nav-link {{ request()->routeIs('restaurant.index') || request()->routeIs('restaurant.orders.*') ? 'active' : '' }}">
+                                                    <i class="nav-icon fa-regular fa-circle"></i>
+                                                    <p>Restaurante</p>
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a href="{{ route('restaurant.tables.index') }}" class="nav-link {{ request()->routeIs('restaurant.tables.*') ? 'active' : '' }}">
+                                                    <i class="nav-icon fa-regular fa-circle"></i>
+                                                    <p>Mesas</p>
+                                                </a>
+                                            </li>
+                                        @endcan
+                                        @can('manage_restaurant_kitchen')
+                                            <li class="nav-item">
+                                                <a href="{{ route('restaurant.kitchen.index') }}" class="nav-link {{ request()->routeIs('restaurant.kitchen.*') ? 'active' : '' }}">
+                                                    <i class="nav-icon fa-regular fa-circle"></i>
+                                                    <p>Cocina</p>
+                                                </a>
+                                            </li>
+                                        @endcan
+                                        @endif
                                         @can('open_cash_register')
                                             <li class="nav-item">
                                                 <a href="{{ route('cash-register.index') }}" class="nav-link {{ request()->routeIs('cash-register.*') ? 'active' : '' }}">
@@ -408,6 +448,20 @@
                                                     <p>Configuracion</p>
                                                 </a>
                                             </li>
+                                            <li class="nav-item">
+                                                <a href="{{ route('admin.implementation-progress') }}" class="nav-link {{ request()->routeIs('admin.implementation-progress') ? 'active' : '' }}">
+                                                    <i class="nav-icon fa-regular fa-circle"></i>
+                                                    <p>Progreso multiempresa</p>
+                                                </a>
+                                            </li>
+                                            @if (auth()->user()?->isSystemAdmin())
+                                                <li class="nav-item">
+                                                    <a href="{{ route('system.companies.index') }}" class="nav-link {{ request()->routeIs('system.companies.*') ? 'active' : '' }}">
+                                                        <i class="nav-icon fa-regular fa-circle"></i>
+                                                        <p>Empresas y suscripciones</p>
+                                                    </a>
+                                                </li>
+                                            @endif
                                         @endcan
                                     </ul>
                                 </li>
@@ -420,6 +474,14 @@
             <main class="app-main">
                 <div class="app-content pt-3">
                     <div class="container-fluid" id="app-main-content">
+                        @if (! empty($subscriptionAccess['warning']))
+                            <div class="alert alert-warning d-flex justify-content-between align-items-center mb-3" role="alert">
+                                <span>{{ $subscriptionAccess['message'] }}</span>
+                                @if (($subscriptionAccess['days_left'] ?? null) !== null)
+                                    <span class="badge text-bg-dark">{{ $subscriptionAccess['days_left'] }} dias</span>
+                                @endif
+                            </div>
+                        @endif
                         @php
                             $currentRouteName = request()->route()?->getName();
                             $principalRoutes = [
@@ -441,6 +503,8 @@
                                 'security.users.index',
                                 'security.roles.index',
                                 'settings.edit',
+                                'admin.implementation-progress',
+                                'system.companies.index',
                                 'products.index',
                                 'categories.index',
                                 'customers.index',
@@ -1081,6 +1145,3 @@
         </script>
     </body>
 </html>
-
-
-

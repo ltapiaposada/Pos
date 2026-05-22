@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CompanyRules;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SaleRequest extends FormRequest
@@ -35,10 +36,10 @@ class SaleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'branch_id' => ['required', 'integer', 'exists:branches,id'],
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'branch_id' => ['required', 'integer', CompanyRules::companyScoped('branches')],
+            'customer_id' => ['required', 'integer', CompanyRules::companyScoped('customers')],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', CompanyRules::companyScoped('products')],
             'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount_type' => ['nullable', 'in:percent,fixed'],
