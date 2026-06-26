@@ -52,6 +52,14 @@
             color: #1e3a8a;
             font-size: .92rem;
         }
+        .payment-policy-note {
+            border: 1px solid #c7d2fe;
+            border-radius: .9rem;
+            background: #eef2ff;
+            padding: .95rem 1rem;
+            color: #312e81;
+            font-size: .92rem;
+        }
         .qr-lightbox {
             position: fixed;
             inset: 0;
@@ -141,6 +149,11 @@
             background: rgba(30, 58, 138, .22);
             color: #bfdbfe;
         }
+        body.dark-mode .payment-policy-note {
+            border-color: rgba(99, 102, 241, .35);
+            background: rgba(49, 46, 129, .28);
+            color: #c7d2fe;
+        }
         body.dark-mode .qr-lightbox__dialog {
             background: #0f172a;
             box-shadow: 0 24px 60px rgba(2, 6, 23, .55);
@@ -159,7 +172,7 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h1 class="h4 mb-1 text-white">Finalizar compra</h1>
-                <p class="mb-0 text-white-50">Completa tus datos y confirma tu pedido.</p>
+                <p class="mb-0 text-white-50">Completa tus datos y envia tu pedido para validacion.</p>
             </div>
             <a href="{{ route('shop.cart') }}" class="btn btn-light btn-sm">Volver al carrito</a>
         </div>
@@ -174,10 +187,15 @@
                         @if ($isRestaurantCatalog)
                             <div class="col-12">
                                 <div class="restaurant-order-note">
-                                    Este pedido entrar&aacute; al flujo normal del restaurante: cocina, preparaci&oacute;n y cierre posterior en caja.
+                                    Este pedido entrara al flujo normal del restaurante. Primero sera revisado y luego pasara a cocina o a preparacion.
                                 </div>
                             </div>
                         @endif
+                        <div class="col-12">
+                            <div class="payment-policy-note">
+                                Tu pedido se registrara de inmediato, pero el pago no se valida automaticamente. Si eliges transferencia o QR, el comercio revisara tu referencia antes de confirmar el pedido.
+                            </div>
+                        </div>
                         <div class="col-md-6">
                             <label class="form-label">Nombre</label>
                             <input type="text" class="form-control" value="{{ auth()->user()->name }}" disabled>
@@ -206,13 +224,11 @@
                         <div class="col-md-6">
                             <label for="payment_method" class="form-label">Metodo de pago</label>
                             <select id="payment_method" name="payment_method" class="form-select" required>
-                                <option value="card" @selected(old('payment_method') === 'card')>Tarjeta</option>
-                                <option value="transfer" @selected(old('payment_method') === 'transfer')>Transferencia</option>
+                                <option value="transfer" @selected(old('payment_method', 'transfer') === 'transfer')>Transferencia bancaria</option>
                                 <option value="contraentrega" @selected(old('payment_method') === 'contraentrega')>Contraentrega</option>
                                 @if ($paymentQrUrl)
                                     <option value="qr" @selected(old('payment_method') === 'qr')>QR</option>
                                 @endif
-                                <option value="other" @selected(old('payment_method') === 'other')>Otro</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -220,7 +236,7 @@
                             <input type="text" id="coupon_code" name="coupon_code" class="form-control" value="{{ old('coupon_code') }}" placeholder="Ej: BIENVENIDO10">
                         </div>
                         <div class="col-md-6" id="payment-reference-wrapper">
-                            <label for="payment_reference" class="form-label">Referencia de pago</label>
+                            <label for="payment_reference" class="form-label">Referencia reportada</label>
                             <input
                                 type="text"
                                 id="payment_reference"
@@ -229,6 +245,7 @@
                                 value="{{ old('payment_reference') }}"
                                 placeholder="Ej: TRX-123456"
                             >
+                            <div class="form-text">Solo aplica para transferencia o QR. El comercio la revisara manualmente.</div>
                         </div>
                         <div class="col-12">
                             <label for="customer_note" class="form-label">Nota del pedido</label>
@@ -238,14 +255,14 @@
                             <div class="col-12" id="payment-qr-wrapper">
                                 <div class="payment-qr-box">
                                     <div class="fw-semibold mb-2">Pago por QR</div>
-                                    <p class="text-muted small mb-2">Si eliges QR, escanea esta imagen para realizar el pago.</p>
-                                    <p class="text-muted small mb-2">Toca el QR para ampliarlo.</p>
+                                    <p class="text-muted small mb-2">Si eliges QR, escanea esta imagen y luego registra tu referencia o soporte.</p>
+                                    <p class="text-muted small mb-2">Toca el QR para ampliarlo. La validacion del pago sigue siendo manual.</p>
                                     <img src="{{ $paymentQrUrl }}" alt="QR de pago" class="payment-qr-image js-qr-trigger">
                                 </div>
                             </div>
                         @endif
                         <div class="col-12">
-                            <button type="submit" class="btn btn-primary">Confirmar pedido</button>
+                            <button type="submit" class="btn btn-primary">Enviar pedido</button>
                         </div>
                     </form>
                 </div>

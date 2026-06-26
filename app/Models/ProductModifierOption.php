@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Support\UnitConverter;
 
 class ProductModifierOption extends Model
 {
@@ -51,6 +52,12 @@ class ProductModifierOption extends Model
 
     public function stockQuantityPerSelection(): float
     {
-        return round((float) ($this->inventory_quantity ?? 0) * (float) ($this->inventory_unit_factor ?? 1), 6);
+        $factor = UnitConverter::resolveFactor(
+            $this->inventory_unit,
+            $this->product?->unit,
+            (float) ($this->inventory_unit_factor ?? 1)
+        );
+
+        return round((float) ($this->inventory_quantity ?? 0) * $factor, 6);
     }
 }

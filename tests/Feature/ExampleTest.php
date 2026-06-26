@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -16,7 +17,8 @@ class ExampleTest extends TestCase
     {
         $this->seed();
 
-        $response = $this->get('/');
+        $user = User::query()->where('email', 'admin@pos.test')->firstOrFail();
+        $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertStatus(200);
     }

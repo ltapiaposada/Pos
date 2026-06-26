@@ -58,7 +58,7 @@ class PurchaseController extends Controller
             ->with('tax:id,rate')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'sku', 'cost_price', 'tax_id']);
+            ->get(['id', 'name', 'sku', 'cost_price', 'tax_id', 'product_type']);
 
         $productCatalog = $products->map(function (Product $product) {
             return [
@@ -67,6 +67,7 @@ class PurchaseController extends Controller
                 'sku' => $product->sku,
                 'cost_price' => (float) $product->cost_price,
                 'tax_rate' => (float) ($product->tax?->rate ?? 0),
+                'product_type' => $product->product_type,
             ];
         })->values();
 
@@ -116,7 +117,7 @@ class PurchaseController extends Controller
 
     public function show(Purchase $purchase)
     {
-        $purchase->load(['items', 'branch', 'user', 'payments.user']);
+        $purchase->load(['items.serials', 'items.lots', 'branch', 'user', 'payments.user']);
 
         return view('purchases.show', compact('purchase'));
     }

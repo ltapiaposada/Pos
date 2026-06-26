@@ -44,7 +44,18 @@
                         <tbody>
                             @foreach ($sale->items as $item)
                                 <tr>
-                                    <td>{{ $item->product_name }}</td>
+                                    <td>
+                                        {{ $item->product_name }}
+                                        @if ($item->serials->isNotEmpty())
+                                            <div class="text-xs text-base-content/60">Seriales: {{ $item->serials->pluck('serial_number')->join(', ') }}</div>
+                                        @endif
+                                        @if ($item->lots->isNotEmpty())
+                                            <div class="text-xs text-base-content/60">Lotes: {{ $item->lots->map(fn ($allocation) => $allocation->lot?->lot_number.' ('.number_format((float) $allocation->quantity, 3).')')->join(', ') }}</div>
+                                        @endif
+                                        @if ($item->delivery_instructions)
+                                            <div class="mt-1 whitespace-pre-line text-xs">{{ $item->delivery_instructions }}</div>
+                                        @endif
+                                    </td>
                                     <td>{{ number_format($item->quantity, 3) }}</td>
                                     <td>${{ number_format($item->unit_price, 2) }}</td>
                                     <td>${{ number_format($item->line_total, 2) }}</td>
@@ -68,15 +79,25 @@
                     <div class="flex justify-between"><span>Cambio</span><span>${{ number_format($sale->change_total, 2) }}</span></div>
                 </div>
                 <div class="mt-4">
-                    <h3 class="text-xs font-semibold uppercase text-base-content/60">Pagos</h3>
-                    <ul class="mt-2 text-sm space-y-1">
-                        @foreach ($sale->payments as $payment)
-                            <li class="flex justify-between">
-                                <span>{{ $payment->method === 'cash' ? 'Efectivo' : ($payment->method === 'card' ? 'Tarjeta' : ($payment->method === 'transfer' ? 'Transferencia' : ($payment->method === 'credit' ? 'Credito' : strtoupper($payment->method)))) }}</span>
-                                <span>${{ number_format($payment->amount, 2) }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
+                    @if ($sale->medicalOrder)
+                        <div class="rounded-2xl border border-primary/20 bg-primary/5 p-3 text-sm">
+                            <p class="font-semibold">Orden medica vinculada</p>
+                            <p class="text-base-content/70">Orden #{{ $sale->medicalOrder->id }} del paciente {{ $sale->customer?->name ?? 'N/A' }}</p>
+                            <a href="{{ route('optometry.orders.show', $sale->medicalOrder) }}" class="btn btn-outline btn-xs mt-2">Ver orden</a>
+                        </div>
+                    @endif
+
+                    <div class="mt-4">
+                        <h3 class="text-xs font-semibold uppercase text-base-content/60">Pagos</h3>
+                        <ul class="mt-2 text-sm space-y-1">
+                            @foreach ($sale->payments as $payment)
+                                <li class="flex justify-between">
+                                    <span>{{ $payment->method === 'cash' ? 'Efectivo' : ($payment->method === 'card' ? 'Tarjeta' : ($payment->method === 'transfer' ? 'Transferencia' : ($payment->method === 'credit' ? 'Credito' : strtoupper($payment->method)))) }}</span>
+                                    <span>${{ number_format($payment->amount, 2) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>

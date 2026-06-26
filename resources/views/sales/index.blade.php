@@ -55,7 +55,7 @@
                         </div>
                         <div class="mt-3 space-y-1 text-sm">
                             <p><span class="text-base-content/60">Sucursal:</span> {{ $sale->branch?->name }}</p>
-                            <p><span class="text-base-content/60">Cliente:</span> {{ $sale->customer?->name ?? 'Consumidor final' }}</p>
+                            <p><span class="text-base-content/60">Cliente:</span> {{ $sale->customer?->name ?? 'Cliente Mostrador' }}</p>
                             <p><span class="text-base-content/60">Vendedor:</span> {{ $sale->user?->name }}</p>
                         </div>
                         <div class="mt-3 flex items-center justify-between">
@@ -100,7 +100,7 @@
                                 <td>#{{ $sale->sale_number }}</td>
                                 <td>{{ $sale->sold_at?->format('Y-m-d H:i') }}</td>
                                 <td>{{ $sale->branch?->name }}</td>
-                                <td>{{ $sale->customer?->name ?? 'Consumidor final' }}</td>
+                                <td>{{ $sale->customer?->name ?? 'Cliente Mostrador' }}</td>
                                 <td>{{ $sale->user?->name }}</td>
                                 <td>
                                     @if ($sale->order_source === \App\Models\Sale::SOURCE_ECOMMERCE)

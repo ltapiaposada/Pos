@@ -2,26 +2,37 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\Concerns\SeedsDemoData;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
+    use SeedsDemoData;
+
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
-        $this->call([
+        $seeders = [
             KickoffSeeder::class,
             TaxSeeder::class,
-            ProductSeeder::class,
-            ProductTypeDemoSeeder::class,
-            CustomerSeeder::class,
-            InventorySeeder::class,
             SettingsSeeder::class,
             AccountingSeeder::class,
-        ]);
+        ];
+
+        if ($this->shouldSeedDemoData()) {
+            $seeders = [
+                ...$seeders,
+                ProductSeeder::class,
+                ProductTypeDemoSeeder::class,
+                CustomerSeeder::class,
+                InventorySeeder::class,
+            ];
+        }
+
+        $this->call($seeders);
 
         $this->syncPostgresSequences();
     }

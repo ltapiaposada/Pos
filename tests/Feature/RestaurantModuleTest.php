@@ -368,6 +368,61 @@ class RestaurantModuleTest extends TestCase
         $this->assertDatabaseCount('payments', 1);
     }
 
+    public function test_restaurant_order_without_customer_uses_counter_customer_when_converted(): void
+    {
+        $this->seed();
+        $user = User::where('email', 'cashier@pos.test')->firstOrFail();
+        $this->markUserCompanyAsRestaurant($user);
+        $counterCustomer = Customer::where('document', 'CF')->firstOrFail();
+        CashRegisterSession::create([
+            'branch_id' => $user->branch_id,
+            'user_id' => $user->id,
+            'opened_at' => now(),
+            'opening_amount' => 25,
+            'status' => 'open',
+        ]);
+
+        $product = Product::query()->findOrFail(1);
+        $paymentTotal = round(1.20 * (1 + ((float) ($product->tax?->rate ?? 0) / 100)), 2);
+        $order = RestaurantOrder::query()->create([
+            'branch_id' => $user->branch_id,
+            'user_id' => $user->id,
+            'customer_id' => null,
+            'order_number' => 999,
+            'order_type' => RestaurantOrder::TYPE_TAKEAWAY,
+            'status' => RestaurantOrder::STATUS_OPEN,
+            'subtotal' => 1.20,
+            'tax' => 0,
+            'discount' => 0,
+            'total' => 1.20,
+            'opened_at' => now(),
+        ]);
+        $order->items()->create([
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 1.20,
+            'subtotal' => 1.20,
+            'kitchen_status' => RestaurantOrderItem::STATUS_PENDING,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('restaurant.orders.convert-to-sale', $order), [
+                'payments' => [['method' => 'cash', 'amount' => $paymentTotal]],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('restaurant_orders', [
+            'id' => $order->id,
+            'customer_id' => $counterCustomer->id,
+            'status' => RestaurantOrder::STATUS_CLOSED,
+        ]);
+        $this->assertDatabaseHas('sales', [
+            'customer_id' => $counterCustomer->id,
+            'order_source' => Sale::SOURCE_RESTAURANT,
+        ]);
+    }
+
     public function test_takeaway_order_can_be_created_without_table(): void
     {
         $this->seed();
@@ -502,6 +557,60 @@ class RestaurantModuleTest extends TestCase
             ])
             ->assertJsonMissing([
                 'id' => $soldOut->id,
+            ]);
+    }
+
+    public function test_restaurant_products_endpoint_includes_grouped_kits(): void
+    {
+        $this->seed();
+        $user = User::where('email', 'cashier@pos.test')->firstOrFail();
+        $this->markUserCompanyAsRestaurant($user);
+        $component = Product::query()->create([
+            'name' => 'Componente agrupado',
+            'sku' => 'REST-GROUP-COMP',
+            'unit' => 'g',
+            'product_type' => Product::TYPE_SIMPLE,
+            'cost_price' => 1,
+            'sale_price' => 2,
+            'is_active' => true,
+        ]);
+        $kit = Product::query()->create([
+            'name' => 'Producto compuesto agrupado',
+            'sku' => 'REST-GROUP-KIT',
+            'unit' => 'unit',
+            'product_type' => Product::TYPE_KIT,
+            'uses_component_groups' => true,
+            'cost_price' => 5,
+            'sale_price' => 20,
+            'is_active' => true,
+        ]);
+        $group = $kit->modifierGroups()->create([
+            'name' => 'Proteina',
+            'selection_type' => ProductModifierGroup::TYPE_SINGLE,
+            'is_required' => true,
+            'min_select' => 1,
+            'max_select' => 1,
+        ]);
+        $group->options()->create([
+            'product_id' => $component->id,
+            'label' => 'Componente agrupado',
+            'inventory_quantity' => 250,
+            'inventory_unit' => 'g',
+            'inventory_unit_factor' => 1,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('restaurant.products', [
+            'branch_id' => $user->branch_id,
+            'q' => 'REST-GROUP-KIT',
+        ]));
+
+        $response->assertOk()
+            ->assertJsonFragment([
+                'id' => $kit->id,
+                'sku' => 'REST-GROUP-KIT',
+                'uses_component_groups' => true,
             ]);
     }
 

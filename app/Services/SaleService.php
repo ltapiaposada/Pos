@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CashRegisterSession;
 use App\Models\Branch;
 use App\Models\Customer;
+use App\Models\MedicalOrder;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
@@ -12,6 +13,7 @@ use App\Models\SaleItem;
 use App\Models\Setting;
 use App\Services\AccountingPostingService;
 use App\Services\InventoryService;
+use App\Support\UnitConverter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +25,7 @@ class SaleService
         return DB::transaction(function () use ($payload, $userId) {
             $branchId = (int) $payload['branch_id'];
             $companyId = Branch::withoutGlobalScopes()->whereKey($branchId)->value('company_id');
+            $medicalOrder = null;
             $cashSession = CashRegisterSession::query()
                 ->where('branch_id', $branchId)
                 ->where('user_id', $userId)
@@ -44,10 +47,22 @@ class SaleService
 
             $allowNegative = (bool) (Setting::getValue('business')['allow_negative_stock'] ?? false);
             $products = Product::query()
-                ->with(['tax', 'kitItems.componentProduct'])
+                ->with(['tax', 'kitItems.componentProduct', 'modifierGroups.options.product'])
                 ->whereIn('id', collect($items)->pluck('product_id'))
                 ->get()
                 ->keyBy('id');
+
+            $items = collect($items)->map(function (array $item) use ($products): array {
+                $product = $products->get((int) ($item['product_id'] ?? 0));
+                if (! $product?->uses_component_groups) {
+                    return $item;
+                }
+
+                $item['inventory_components'] = app(ProductModifierSelectionService::class)
+                    ->normalizeForProduct($product, collect($item['modifier_selections'] ?? []));
+
+                return $item;
+            })->all();
 
             $inventoryProductIds = $products->values()
                 ->flatMap(function (Product $product) {
@@ -116,6 +131,9 @@ class SaleService
                     'product_name' => $product->name,
                     'sku' => $product->sku,
                     'barcode' => $product->barcode,
+                    'delivery_instructions' => $product->product_type === Product::TYPE_DIGITAL
+                        ? $product->delivery_instructions
+                        : null,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount_type' => $discountType,
@@ -170,12 +188,38 @@ class SaleService
                 ->lockForUpdate()
                 ->value('sale_number');
             $nextNumber = ((int) $lastNumber) + 1;
+            $currency = $payload['currency'] ?? $this->resolveCurrency($companyId);
+
+            if (! empty($payload['medical_order_id'])) {
+                $medicalOrder = MedicalOrder::query()
+                    ->whereKey((int) $payload['medical_order_id'])
+                    ->first();
+
+                if (! $medicalOrder) {
+                    throw ValidationException::withMessages([
+                        'medical_order_id' => 'La orden medica seleccionada no existe.',
+                    ]);
+                }
+
+                if ($medicalOrder->status !== MedicalOrder::STATUS_ACTIVE) {
+                    throw ValidationException::withMessages([
+                        'medical_order_id' => 'Solo puedes usar ordenes medicas activas en una venta.',
+                    ]);
+                }
+
+                if ((int) $medicalOrder->customer_id !== (int) $payload['customer_id']) {
+                    throw ValidationException::withMessages([
+                        'medical_order_id' => 'La orden medica no corresponde al cliente seleccionado.',
+                    ]);
+                }
+            }
 
             $sale = Sale::query()->create([
                 'company_id' => $companyId,
                 'branch_id' => $branchId,
                 'user_id' => $userId,
                 'customer_id' => $payload['customer_id'] ?? null,
+                'medical_order_id' => $medicalOrder?->id,
                 'cash_register_session_id' => $cashSession->id,
                 'sale_number' => $nextNumber,
                 'status' => $balanceTotal > 0 ? Sale::STATUS_PENDING : Sale::STATUS_PAID,
@@ -191,7 +235,7 @@ class SaleService
                 'total' => $total,
                 'paid_total' => $paidTotal,
                 'change_total' => $changeTotal,
-                'currency' => $payload['currency'] ?? config('pos.default_currency', 'USD'),
+                'currency' => $currency,
                 'sold_at' => now(),
             ]);
 
@@ -200,7 +244,7 @@ class SaleService
                 unset($line['inventory_components']);
                 $line['sale_id'] = $sale->id;
                 $line['company_id'] = $companyId;
-                SaleItem::query()->create($line);
+                $saleItem = SaleItem::query()->create($line);
 
                 $product = $products->get($line['product_id']);
                 $this->applyInventoryMovementsForSaleLine(
@@ -210,6 +254,12 @@ class SaleService
                     saleId: $sale->id,
                     lineQuantity: (float) $line['quantity'],
                     extraComponents: $inventoryComponents
+                );
+                app(InventoryTrackingService::class)->consume(
+                    product: $product,
+                    branchId: $branchId,
+                    saleItem: $saleItem,
+                    quantity: (float) $line['quantity']
                 );
             }
 
@@ -249,8 +299,22 @@ class SaleService
                 ]);
             }
 
+            if ($medicalOrder) {
+                $medicalOrder->update([
+                    'status' => MedicalOrder::STATUS_USED,
+                ]);
+            }
+
             return $sale->load(['items', 'payments', 'customer', 'user', 'branch']);
         });
+    }
+
+    private function resolveCurrency(?int $companyId): string
+    {
+        $business = Setting::getValue('business', [], $companyId);
+        $currency = is_array($business) ? trim((string) ($business['currency'] ?? '')) : '';
+
+        return $currency !== '' ? $currency : config('pos.default_currency', 'USD');
     }
 
     private function assertStockForLine(Product $product, float $lineQuantity, Collection $inventoriesByProduct, array $extraComponents = []): void
@@ -310,16 +374,23 @@ class SaleService
     {
         $requirements = [];
 
-        if ($product->product_type === Product::TYPE_KIT) {
-            if ($product->kitItems->isEmpty()) {
+        if (! $product->tracksInventory()) {
+            $requirements = [];
+        } elseif ($product->product_type === Product::TYPE_KIT) {
+            if ($product->kitItems->isEmpty() && empty($extraComponents)) {
                 throw ValidationException::withMessages([
                     'items' => "El kit {$product->name} no tiene componentes configurados.",
                 ]);
             }
 
             foreach ($product->kitItems as $kitItem) {
+                $factor = UnitConverter::resolveFactor(
+                    $kitItem->component_unit,
+                    $kitItem->componentProduct?->unit,
+                    (float) ($kitItem->component_unit_factor ?? 1)
+                );
                 $requirements[$kitItem->component_product_id] = ($requirements[$kitItem->component_product_id] ?? 0)
-                    + (((float) $kitItem->quantity * (float) ($kitItem->component_unit_factor ?? 1)) * $lineQuantity);
+                    + (((float) $kitItem->quantity * $factor) * $lineQuantity);
             }
         } else {
             $requirements[$product->id] = ($requirements[$product->id] ?? 0) + $lineQuantity;

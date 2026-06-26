@@ -14,6 +14,7 @@ use App\Models\RestaurantTable;
 use App\Models\Sale;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Support\UnitConverter;
 
 class RestaurantOrderService
 {
@@ -229,10 +230,23 @@ class RestaurantOrderService
                 ]);
             }
 
-            $customerId = $payload['customer_id']
-                ?? $order->customer_id
-                ?? Customer::query()->where('document', 'CF')->value('id')
-                ?? Customer::query()->orderBy('id')->value('id');
+            $customerId = $payload['customer_id'] ?? $order->customer_id;
+
+            if (! $customerId) {
+                $customerId = Customer::query()
+                    ->where('is_active', true)
+                    ->where(function ($query): void {
+                        $query->where('document', 'CF')
+                            ->orWhere('name', 'like', '%Mostrador%');
+                    })
+                    ->orderByRaw("CASE WHEN document = 'CF' THEN 0 ELSE 1 END")
+                    ->value('id');
+            }
+
+            $customerId ??= Customer::query()
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->value('id');
 
             if (! $customerId) {
                 throw ValidationException::withMessages([
@@ -385,6 +399,13 @@ class RestaurantOrderService
                     $action = RestaurantOrderItemSelection::ACTION_REMOVE;
                 }
 
+                $inventoryUnit = $option->inventory_unit ?: $option->product?->unit;
+                $factor = UnitConverter::resolveFactor(
+                    $inventoryUnit,
+                    $option->product?->unit,
+                    (float) ($option->inventory_unit_factor ?? 1)
+                );
+
                 return [
                     'company_id' => $product->company_id,
                     'product_modifier_group_id' => $group->id,
@@ -395,9 +416,9 @@ class RestaurantOrderService
                     'selection_action' => $action,
                     'price_delta' => $action === RestaurantOrderItemSelection::ACTION_INCLUDE ? (float) $option->price_delta : 0,
                     'inventory_quantity' => (float) ($option->inventory_quantity ?? 0),
-                    'inventory_unit' => $option->inventory_unit ?: $option->product?->unit,
-                    'inventory_unit_factor' => (float) ($option->inventory_unit_factor ?? 1),
-                    'stock_quantity' => round((float) ($option->inventory_quantity ?? 0) * (float) ($option->inventory_unit_factor ?? 1), 6),
+                    'inventory_unit' => $inventoryUnit,
+                    'inventory_unit_factor' => $factor,
+                    'stock_quantity' => round((float) ($option->inventory_quantity ?? 0) * $factor, 6),
                 ];
             })
             ->values();

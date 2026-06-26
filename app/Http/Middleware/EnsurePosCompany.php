@@ -17,8 +17,8 @@ class EnsurePosCompany
             return redirect()->route('login');
         }
 
-        if (CompanyContext::activeSubscriptionPlanType($user->company) === 'restaurant') {
-            abort(403, 'Este modulo no esta disponible para empresas tipo restaurante.');
+        if (! CompanyContext::supportsClassicPos($user->company)) {
+            abort(403, 'Este modulo solo esta disponible cuando el servicio activo es POS u Optica.');
         }
 
         return $next($request);

@@ -9,7 +9,7 @@
             </div>
             <div class="page-actions">
                 <form method="GET" class="join">
-                    <input name="q" value="{{ request('q') }}" placeholder="Buscar" class="input input-bordered join-item input-sm">
+                    <input name="q" value="{{ request('q') }}" placeholder="Nombre, SKU o parte del codigo" class="input input-bordered join-item input-sm">
                     <button class="btn btn-outline btn-sm join-item">Buscar</button>
                 </form>
                 <a href="{{ route('products.create') }}" class="btn btn-primary btn-sm w-full sm:w-auto">Nuevo</a>
@@ -31,6 +31,9 @@
                             <div class="min-w-0 flex-1">
                                 <p class="text-sm font-semibold">{{ $product->name }}</p>
                                 <p class="text-xs text-base-content/60">{{ $product->sku }}</p>
+                                @if ($product->barcode)
+                                    <p class="text-xs text-base-content/60">Codigo: {{ $product->barcode }}</p>
+                                @endif
                                 <p class="text-xs text-base-content/60">{{ $product->category?->name ?? 'Sin categoria' }}</p>
                             </div>
                         </div>
@@ -95,7 +98,12 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td>{{ $product->sku }}</td>
+                                <td>
+                                    <div>{{ $product->sku }}</div>
+                                    @if ($product->barcode)
+                                        <div class="text-xs text-base-content/60">Codigo: {{ $product->barcode }}</div>
+                                    @endif
+                                </td>
                                 <td>
                                     <div class="text-sm capitalize">{{ $product->product_type ?? 'simple' }}</div>
                                     @if ($product->parentProduct)

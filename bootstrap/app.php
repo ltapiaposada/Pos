@@ -13,6 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->trustProxies(at: ['127.0.0.1', '::1']);
+
+        $middleware->web(append: [
+            \App\Http\Middleware\ApplySecurityHeaders::class,
+        ]);
+
         if (env('APP_ENV') === 'local') {
             $middleware->web(append: [
                 \App\Http\Middleware\RequestProfiler::class,
@@ -28,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'system.admin' => \App\Http\Middleware\EnsureSystemAdmin::class,
             'active.subscription' => \App\Http\Middleware\EnsureActiveSubscription::class,
             'pos.company' => \App\Http\Middleware\EnsurePosCompany::class,
+            'optic.company' => \App\Http\Middleware\EnsureOpticCompany::class,
             'restaurant.company' => \App\Http\Middleware\EnsureRestaurantCompany::class,
             'storefront.company' => \App\Http\Middleware\ResolveStorefrontCompany::class,
         ]);

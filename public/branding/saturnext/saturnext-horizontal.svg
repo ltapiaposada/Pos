@@ -1,0 +1,32 @@
+<svg width="1600" height="500" viewBox="0 0 1600 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="saturnext-gradient" x1="120" y1="90" x2="470" y2="340" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="0.52" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="ring-gradient" x1="115" y1="140" x2="450" y2="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#67E8F9"/>
+      <stop offset="0.5" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <filter id="glow" x="0" y="0" width="650" height="420" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="500" rx="36" fill="#F8FAFC"/>
+
+  <g transform="translate(90 70)">
+    <text x="0" y="260" fill="url(#saturnext-gradient)" font-size="270" font-weight="800" font-family="Segoe UI, Montserrat, Arial, sans-serif" letter-spacing="-8">S</text>
+    <ellipse cx="180" cy="170" rx="170" ry="62" transform="rotate(-14 180 170)" stroke="url(#ring-gradient)" stroke-width="20" filter="url(#glow)"/>
+    <ellipse cx="180" cy="170" rx="170" ry="62" transform="rotate(-14 180 170)" stroke="#E0F2FE" stroke-width="6" stroke-dasharray="24 18"/>
+  </g>
+
+  <text x="390" y="295" fill="#0F172A" font-size="160" font-weight="750" font-family="Segoe UI, Montserrat, Arial, sans-serif" letter-spacing="12">ATURNEXT</text>
+  <text x="398" y="352" fill="#475569" font-size="36" font-weight="600" font-family="Segoe UI, Montserrat, Arial, sans-serif" letter-spacing="10">SOFTWARE SOLUTIONS</text>
+</svg>

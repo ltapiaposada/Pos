@@ -43,10 +43,11 @@ class AccountingCreditControlTest extends TestCase
             ],
             'payments' => [
                 ['method' => 'cash', 'amount' => 2],
-                ['method' => 'credit', 'amount' => 20],
+                ['method' => 'credit', 'amount' => 9.60],
             ],
         ])->assertRedirect();
 
+        $this->assertDatabaseCount('sales', 1);
         $sale = Sale::query()->firstOrFail();
         $balance = round((float) $sale->total - (float) $sale->paid_total, 2);
         $this->assertGreaterThan(0, $balance);
@@ -164,10 +165,11 @@ class AccountingCreditControlTest extends TestCase
             ],
             'payments' => [
                 ['method' => 'cash', 'amount' => 2],
-                ['method' => 'credit', 'amount' => 20],
+                ['method' => 'credit', 'amount' => 9.60],
             ],
         ])->assertRedirect();
 
+        $this->assertDatabaseCount('sales', 1);
         $sale = Sale::query()->firstOrFail();
         $amount = 5.00;
         $this->actingAs($user)->post(route('accounting.receivables.collect', $sale), [

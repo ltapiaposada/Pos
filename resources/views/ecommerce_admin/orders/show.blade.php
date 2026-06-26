@@ -4,19 +4,30 @@
     @php
         $paymentLabels = [
             'card' => 'Tarjeta',
-            'transfer' => 'Transferencia',
-            'qr' => 'Pago QR',
+            'transfer' => 'Transferencia por validar',
+            'qr' => 'QR por validar',
             'contraentrega' => 'Contraentrega',
             'other' => 'Otro',
             'cash' => 'Efectivo',
             'credit' => 'Credito',
         ];
+        $paymentMethod = $order->payments->first()?->method;
+        $paymentReference = $order->payments->first()?->reference;
+        $paymentHint = match ($paymentMethod) {
+            'transfer', 'qr' => $order->status === \App\Models\Sale::STATUS_PENDING
+                ? 'Valida la referencia antes de confirmar y facturar.'
+                : 'Pago manual validado para continuar el flujo del pedido.',
+            'contraentrega' => $order->status === \App\Models\Sale::STATUS_DELIVERED
+                ? 'Cobro completado en la entrega.'
+                : 'El cobro se completa al entregar el pedido.',
+            default => 'Metodo heredado o no recomendado para el storefront actual.',
+        };
     @endphp
     <div class="page-header">
         <div class="page-header-row">
             <div>
                 <h1 class="page-title">Pedido #{{ $order->sale_number }}</h1>
-                <p class="page-subtitle">Detalle operativo del pedido e-commerce</p>
+                <p class="page-subtitle">Detalle operativo del pedido web con validacion manual</p>
             </div>
             <div class="page-actions">
                 <a href="{{ route('ecommerce-admin.orders.index') }}" class="btn btn-outline btn-sm">Volver</a>
@@ -59,6 +70,9 @@
             <div class="panel">
                 <div class="panel-body">
                     <h2 class="text-sm font-semibold mb-3">Gestion del pedido</h2>
+                    @error('order')
+                        <div class="alert alert-error mb-3 text-sm">{{ $message }}</div>
+                    @enderror
                     <form method="POST" action="{{ route('ecommerce-admin.orders.status', $order) }}" class="space-y-3">
                         @csrf
                         @method('PATCH')
@@ -80,6 +94,9 @@
                     <div><strong>Cliente:</strong> {{ $order->customer?->name }}</div>
                     <div><strong>Email:</strong> {{ $order->customer?->email }}</div>
                     <div><strong>Pago:</strong> {{ $paymentLabels[$order->payments->first()?->method ?? ''] ?? 'Sin registrar' }}</div>
+                    <div><strong>Referencia:</strong> {{ $paymentReference ?: 'Sin referencia' }}</div>
+                    <div><strong>Estado de cobro:</strong> {{ round((float) $order->paid_total, 2) >= round((float) $order->total, 2) ? 'Validado' : 'Pendiente de validacion' }}</div>
+                    <div class="text-xs text-base-content/60">{{ $paymentHint }}</div>
                     <div><strong>Direccion:</strong> {{ $order->delivery_address ?: 'Sin direccion' }}</div>
                     <div><strong>Nota:</strong> {{ $order->customer_note ?: 'Sin nota' }}</div>
                     <div><strong>Cupon:</strong> {{ $order->coupon_code ?: 'N/A' }}</div>

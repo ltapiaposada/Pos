@@ -31,7 +31,15 @@
                         <tbody>
                             @foreach ($purchase->items as $item)
                                 <tr>
-                                    <td>{{ $item->product_name }}</td>
+                                    <td>
+                                        {{ $item->product_name }}
+                                        @if ($item->serials->isNotEmpty())
+                                            <div class="text-xs text-base-content/60">Seriales: {{ $item->serials->pluck('serial_number')->join(', ') }}</div>
+                                        @endif
+                                        @if ($item->lots->isNotEmpty())
+                                            <div class="text-xs text-base-content/60">Lote: {{ $item->lots->pluck('lot_number')->join(', ') }}</div>
+                                        @endif
+                                    </td>
                                     <td>{{ number_format($item->quantity, 3) }}</td>
                                     <td>${{ number_format($item->unit_cost, 2) }}</td>
                                     <td>{{ number_format($item->tax_rate, 2) }}</td>

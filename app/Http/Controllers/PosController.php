@@ -7,11 +7,14 @@ use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\CashRegisterSession;
+use App\Models\MedicalOrder;
 use App\Models\Sale;
 use App\Services\InventoryService;
 use App\Services\SaleService;
+use App\Support\CompanyContext;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -39,7 +42,7 @@ class PosController extends Controller
         $oldItems = $this->normalizeOldInputArray($request->session()->getOldInput('items', []));
         $oldProductIds = collect($oldItems)->pluck('product_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
         $oldProducts = Product::query()
-            ->with(['tax:id,rate', 'kitItems.componentProduct'])
+            ->with(['tax:id,rate', 'kitItems.componentProduct', 'modifierGroups.options.product'])
             ->whereIn('id', $oldProductIds)
             ->get(['id', 'name', 'sku', 'tax_id', 'product_type'])
             ->keyBy('id');
@@ -50,7 +53,8 @@ class PosController extends Controller
 
         $oldPosState = [
             'branch_id' => (string) ($request->session()->getOldInput('branch_id') ?? $branchId),
-            'customer_id' => $request->session()->getOldInput('customer_id'),
+            'customer_id' => $request->session()->getOldInput('customer_id', $request->query('customer_id')),
+            'medical_order_id' => $request->session()->getOldInput('medical_order_id', $request->query('medical_order_id')),
             'global_discount' => (float) ($request->session()->getOldInput('global_discount', 0)),
             'items' => collect($oldItems)->map(function (array $item) use ($oldProducts) {
                 $productId = (int) ($item['product_id'] ?? 0);
@@ -60,6 +64,7 @@ class PosController extends Controller
                     'product_id' => $productId,
                     'name' => $product?->name ?? "Producto #{$productId}",
                     'sku' => $product?->sku ?? 'N/A',
+                    'product_type' => $product?->product_type ?? Product::TYPE_SIMPLE,
                     'quantity' => (float) ($item['quantity'] ?? 1),
                     'unit_price' => (float) ($item['unit_price'] ?? 0),
                     'available_stock' => (float) ($availableStockByProduct[$productId] ?? 0),
@@ -78,23 +83,42 @@ class PosController extends Controller
                 })->values()->all(),
         ];
 
-        return view('pos.index', compact('branches', 'branchId', 'customers', 'requiresCashSession', 'oldPosState'));
+        $supportsMedicalOrders = CompanyContext::isOpticService($request->user()?->company);
+        $medicalOrders = collect();
+
+        if ($supportsMedicalOrders && Schema::hasTable('medical_orders')) {
+            $medicalOrders = MedicalOrder::query()
+                ->with('customer:id,name,document')
+                ->where('status', MedicalOrder::STATUS_ACTIVE)
+                ->latest('ordered_at')
+                ->get();
+        }
+
+        return view('pos.index', compact('branches', 'branchId', 'customers', 'requiresCashSession', 'oldPosState', 'medicalOrders', 'supportsMedicalOrders'));
     }
 
     public function products(Request $request)
     {
         $branchId = (int) $request->query('branch_id', $request->user()?->branch_id);
-        $query = Product::query()->where('is_active', true)->with(['tax:id,rate', 'kitItems.componentProduct']);
-        if ($search = $request->get('q')) {
+        $query = Product::query()->where('is_active', true)->with([
+            'tax:id,rate',
+            'kitItems.componentProduct',
+            'modifierGroups.options.product',
+        ]);
+        $search = trim((string) $request->query('q', ''));
+        if ($search !== '') {
             $query->where(function ($builder) use ($search) {
-                $builder->where('name', 'like', "%{$search}%")
-                    ->orWhere('sku', 'like', "%{$search}%")
-                    ->orWhere('barcode', 'like', "%{$search}%");
-            });
+                $builder->where('sku', 'like', "%{$search}%")
+                    ->orWhere('barcode', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            })->orderByRaw(
+                'CASE WHEN barcode = ? THEN 0 WHEN sku = ? THEN 1 ELSE 2 END',
+                [$search, $search]
+            );
         }
 
         $products = $query->orderBy('name')->limit(60)->get([
-            'id', 'name', 'sku', 'barcode', 'sale_price', 'tax_id', 'product_type',
+            'id', 'name', 'sku', 'barcode', 'sale_price', 'tax_id', 'product_type', 'uses_component_groups',
         ]);
 
         $availableByProduct = app(InventoryService::class)->availableStockForProducts($products, $branchId);
@@ -110,6 +134,25 @@ class PosController extends Controller
                 'sale_price' => (float) $product->sale_price,
                 'tax_rate' => (float) ($product->tax?->rate ?? 0),
                 'available_stock' => (float) ($availableByProduct[$product->id] ?? 0),
+                'tracks_inventory' => $product->tracksInventory(),
+                'product_type' => $product->product_type,
+                'uses_component_groups' => $product->uses_component_groups,
+                'modifier_groups' => $product->modifierGroups->map(fn ($group) => [
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'selection_type' => $group->selection_type,
+                    'is_required' => $group->is_required,
+                    'min_select' => $group->min_select,
+                    'max_select' => $group->max_select,
+                    'options' => $group->options
+                        ->where('is_active', true)
+                        ->map(fn ($option) => [
+                            'id' => $option->id,
+                            'label' => $option->label,
+                            'price_delta' => (float) $option->price_delta,
+                            'is_default' => $option->is_default,
+                        ])->values(),
+                ])->values(),
             ];
         })->values();
 
@@ -142,7 +185,7 @@ class PosController extends Controller
         }
 
         $availableStock = app(InventoryService::class)->availableStockForProduct($product, $branchId);
-        if ($availableStock <= 0) {
+        if ($product->tracksInventory() && $availableStock <= 0) {
             return response()->json([
                 'message' => 'El producto no tiene stock disponible en esta sucursal.',
             ], 422);
@@ -156,6 +199,8 @@ class PosController extends Controller
             'sale_price' => (float) $product->sale_price,
             'tax_rate' => (float) ($product->tax?->rate ?? 0),
             'available_stock' => $availableStock,
+            'tracks_inventory' => $product->tracksInventory(),
+            'product_type' => $product->product_type,
         ]);
     }
 
@@ -253,9 +298,10 @@ class PosController extends Controller
         $this->validateDiscounts($request);
 
         try {
-            $sale = $saleService->createSale([
+        $sale = $saleService->createSale([
                 'branch_id' => $request->integer('branch_id'),
                 'customer_id' => $request->input('customer_id'),
+                'medical_order_id' => $request->input('medical_order_id'),
                 'items' => $request->input('items'),
                 'global_discount' => $request->input('global_discount', 0),
                 'payments' => $request->input('payments'),
@@ -271,14 +317,14 @@ class PosController extends Controller
 
     public function show(Sale $sale)
     {
-        $sale->load(['items', 'payments', 'customer', 'user', 'branch']);
+        $sale->load(['items.serials', 'items.lots.lot', 'payments', 'customer', 'user', 'branch', 'medicalOrder']);
 
         return view('sales.show', compact('sale'));
     }
 
     public function ticket(Sale $sale)
     {
-        $sale->load(['items', 'payments', 'customer', 'user', 'branch']);
+        $sale->load(['items.serials', 'items.lots.lot', 'payments', 'customer', 'user', 'branch', 'medicalOrder']);
 
         return view('sales.ticket', compact('sale'));
     }
@@ -286,7 +332,7 @@ class PosController extends Controller
     public function invoices(Request $request)
     {
         $query = Sale::query()
-            ->with(['branch', 'customer', 'user'])
+            ->with(['branch', 'customer', 'user', 'medicalOrder'])
             ->where(function ($builder) {
                 $builder->whereIn('order_source', [Sale::SOURCE_POS, Sale::SOURCE_RESTAURANT])
                     ->orWhereNotNull('invoiced_at');

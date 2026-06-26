@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\Auth;
 
 class CompanyContext
 {
+    public const SERVICE_POS = 'pos';
+    public const SERVICE_RESTAURANT = 'restaurant';
+    public const SERVICE_OPTIC = 'optic';
+
     public static function user()
     {
         return Auth::user();
@@ -110,6 +114,40 @@ class CompanyContext
             ->first();
 
         return $subscription?->plan_type ?? $company->companyType?->slug;
+    }
+
+    public static function activeService(?Company $company = null): ?string
+    {
+        $service = static::activeSubscriptionPlanType($company);
+
+        if (! is_string($service) || trim($service) === '') {
+            return null;
+        }
+
+        return mb_strtolower(trim($service));
+    }
+
+    public static function isRestaurantService(?Company $company = null): bool
+    {
+        return static::activeService($company) === static::SERVICE_RESTAURANT;
+    }
+
+    public static function isPosService(?Company $company = null): bool
+    {
+        return static::activeService($company) === static::SERVICE_POS;
+    }
+
+    public static function isOpticService(?Company $company = null): bool
+    {
+        return static::activeService($company) === static::SERVICE_OPTIC;
+    }
+
+    public static function supportsClassicPos(?Company $company = null): bool
+    {
+        return in_array(static::activeService($company), [
+            static::SERVICE_POS,
+            static::SERVICE_OPTIC,
+        ], true);
     }
 
     public static function companyIdForScopedReads(): ?int

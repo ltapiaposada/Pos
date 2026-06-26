@@ -25,16 +25,16 @@
     </style>
     @php
         $statusLabels = [
-            'pending' => 'Pendiente',
-            'processing' => 'Procesando',
-            'shipped' => 'Enviado',
+            'pending' => 'Recibido',
+            'processing' => 'Confirmado',
+            'shipped' => 'Despachado',
             'delivered' => 'Entregado',
             'cancelled' => 'Cancelado',
         ];
         $paymentLabels = [
             'card' => 'Tarjeta',
-            'transfer' => 'Transferencia',
-            'qr' => 'Pago QR',
+            'transfer' => 'Transferencia por validar',
+            'qr' => 'QR por validar',
             'contraentrega' => 'Contraentrega',
             'other' => 'Otro',
             'cash' => 'Efectivo',
@@ -46,7 +46,7 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h1 class="h4 mb-1 text-white">Pedido #{{ $order->sale_number }}</h1>
-                <p class="mb-0 text-white-50">Detalle completo de tu compra.</p>
+                <p class="mb-0 text-white-50">Detalle y seguimiento de tu pedido web.</p>
             </div>
             <a href="{{ route('shop.orders.index') }}" class="btn btn-light btn-sm">Volver</a>
         </div>
@@ -61,6 +61,12 @@
             <div><strong>Direccion:</strong> {{ $order->delivery_address ?: 'Sin direccion' }}</div>
         </div>
     </div>
+
+    @if ($order->status === 'pending')
+        <div class="alert alert-info">
+            Recibimos tu pedido. Si pagaste por transferencia o QR, revisaremos la referencia antes de confirmarlo.
+        </div>
+    @endif
 
     <div class="row g-4">
         <div class="col-xl-8">
@@ -80,7 +86,18 @@
                             <tbody>
                                 @foreach ($order->items as $item)
                                     <tr>
-                                        <td>{{ $item->product_name }}</td>
+                                        <td>
+                                            {{ $item->product_name }}
+                                            @if ($item->serials->isNotEmpty())
+                                                <div class="small text-muted">Seriales: {{ $item->serials->pluck('serial_number')->join(', ') }}</div>
+                                            @endif
+                                            @if ($item->lots->isNotEmpty())
+                                                <div class="small text-muted">Lotes: {{ $item->lots->map(fn ($allocation) => $allocation->lot?->lot_number)->filter()->join(', ') }}</div>
+                                            @endif
+                                            @if ($item->delivery_instructions)
+                                                <div class="small mt-1">{!! nl2br(e($item->delivery_instructions)) !!}</div>
+                                            @endif
+                                        </td>
                                         <td>{{ number_format((float) $item->quantity, 2) }}</td>
                                         <td>${{ number_format((float) $item->unit_price, 2) }}</td>
                                         <td>${{ number_format((float) $item->tax_amount, 2) }}</td>

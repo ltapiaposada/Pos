@@ -23,7 +23,7 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h1 class="h4 mb-1 text-white">Mis pedidos</h1>
-                <p class="mb-0 text-white-50">Consulta el estado y detalle de tus compras.</p>
+                <p class="mb-0 text-white-50">Consulta el estado de validacion y entrega de tus pedidos.</p>
             </div>
             <a href="{{ route('shop.index') }}" class="btn btn-light btn-sm">Seguir comprando</a>
         </div>
@@ -31,16 +31,16 @@
 
     @php
         $statusLabels = [
-            'pending' => 'Pendiente',
-            'processing' => 'Procesando',
-            'shipped' => 'Enviado',
+            'pending' => 'Recibido',
+            'processing' => 'Confirmado',
+            'shipped' => 'Despachado',
             'delivered' => 'Entregado',
             'cancelled' => 'Cancelado',
         ];
         $paymentLabels = [
             'card' => 'Tarjeta',
-            'transfer' => 'Transferencia',
-            'qr' => 'Pago QR',
+            'transfer' => 'Transferencia por validar',
+            'qr' => 'QR por validar',
             'contraentrega' => 'Contraentrega',
             'other' => 'Otro',
             'cash' => 'Efectivo',
@@ -71,6 +71,9 @@
                             <span class="badge {{ $statusClasses[$order->status] ?? 'text-bg-secondary' }}">{{ $statusLabels[$order->status] ?? strtoupper($order->status) }}</span>
                         </div>
                         <div class="small mt-2">Pago: {{ $paymentLabels[$order->payments->first()?->method ?? ''] ?? 'Sin registrar' }}</div>
+                        @if ($order->status === 'pending')
+                            <div class="small text-muted mt-1">Estamos validando el pago o la modalidad de entrega antes de confirmarlo.</div>
+                        @endif
                         <div class="d-flex justify-content-between align-items-center mt-2">
                             <span>Total</span>
                             <strong>${{ number_format((float) $order->total, 2) }}</strong>

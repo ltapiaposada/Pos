@@ -62,6 +62,20 @@
                                     <input type="number" min="0" step="0.01" x-model.number="item.tax_rate" class="input input-bordered input-sm sm:input-xs w-full">
                                 </div>
                             </div>
+                            <div x-show="item.product_type === 'serialized'" class="mt-3">
+                                <label class="text-base-content/60">Numeros de serie (uno por linea)</label>
+                                <textarea x-model="item.serial_numbers_text" rows="4" class="textarea textarea-bordered w-full" placeholder="SERIE-001&#10;SERIE-002"></textarea>
+                            </div>
+                            <div x-show="item.product_type === 'batch'" class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <div>
+                                    <label class="text-base-content/60">Numero de lote</label>
+                                    <input x-model="item.lot_number" class="input input-bordered input-sm w-full">
+                                </div>
+                                <div>
+                                    <label class="text-base-content/60">Fecha de vencimiento</label>
+                                    <input type="date" x-model="item.expires_at" class="input input-bordered input-sm w-full">
+                                </div>
+                            </div>
                             <div class="mt-2 flex items-center justify-between text-xs">
                                 <span class="text-base-content/60">Subtotal item</span>
                                 <span class="font-semibold" x-text="`$${(toAmount(item.quantity) * toAmount(item.unit_cost)).toFixed(2)}`"></span>
@@ -259,6 +273,12 @@
                         product_id: item.product_id,
                         quantity: this.toAmount(item.quantity),
                         unit_cost: this.toAmount(item.unit_cost),
+                        serial_numbers: String(item.serial_numbers_text || '')
+                            .split(/\r?\n/)
+                            .map(value => value.trim())
+                            .filter(Boolean),
+                        lot_number: item.lot_number || null,
+                        expires_at: item.expires_at || null,
                     })));
                 },
                 addSelectedProduct() {
@@ -280,6 +300,10 @@
                         quantity: 1,
                         unit_cost: this.toAmount(product.cost_price),
                         tax_rate: this.toAmount(product.tax_rate),
+                        product_type: product.product_type,
+                        serial_numbers_text: '',
+                        lot_number: '',
+                        expires_at: '',
                     });
                 },
                 removeItem(index) {

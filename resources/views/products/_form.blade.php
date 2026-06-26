@@ -41,7 +41,32 @@
         ->values()
         ->all();
     $currentImage = old('image_url', $product->image_url ?? null);
+    $usesComponentGroups = (string) old(
+        'uses_component_groups',
+        ($product->product_type ?? null) === \App\Models\Product::TYPE_KIT && ($product->uses_component_groups ?? false) ? '1' : '0'
+    );
+    $unitOptions = \App\Models\Product::unitOptions();
+    $kitComponentOptions = $kitComponentCandidates->map(fn ($candidate) => [
+        'id' => $candidate->id,
+        'name' => $candidate->name,
+        'sku' => $candidate->sku,
+        'barcode' => $candidate->barcode,
+        'unit' => $candidate->unit,
+    ])->values()->all();
 @endphp
+
+@if ($errors->any())
+    <div class="alert alert-error mb-5">
+        <div>
+            <p class="font-semibold">No se pudo guardar el producto:</p>
+            <ul class="mt-1 list-disc pl-5 text-sm">
+                @foreach ($errors->all() as $message)
+                    <li>{{ $message }}</li>
+                @endforeach
+            </ul>
+        </div>
+    </div>
+@endif
 
 <div class="form-grid">
     <div class="sm:col-span-2">
@@ -60,7 +85,18 @@
     </div>
     <div>
         <label class="field-label">Codigo de barras</label>
-        <input name="barcode" value="{{ old('barcode', $product->barcode ?? '') }}" class="input input-bordered w-full">
+        <div class="flex gap-2">
+            <input id="product-barcode" name="barcode" value="{{ old('barcode', $product->barcode ?? '') }}" class="input input-bordered w-full">
+            <button id="open-product-barcode-scanner" type="button" class="btn btn-outline shrink-0">
+                <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                Camara
+            </button>
+            <button id="open-product-remote-scanner" type="button" class="btn btn-outline shrink-0">
+                <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
+                Celular
+            </button>
+        </div>
+        <p id="product-barcode-feedback" class="mt-1 text-xs text-base-content/60"></p>
     </div>
     <div class="sm:col-span-2">
         <label class="field-label">Imagen del producto</label>
@@ -173,7 +209,14 @@
     </div>
     <div>
         <label class="field-label">Unidad</label>
-        <input name="unit" value="{{ old('unit', $product->unit ?? 'unit') }}" class="input input-bordered w-full" required>
+        <select name="unit" class="select select-bordered w-full" required>
+            @foreach ($unitOptions as $value => $label)
+                <option value="{{ $value }}" @selected(old('unit', $product->unit ?? 'unit') === $value)>{{ $label }}</option>
+            @endforeach
+        </select>
+        @error('unit')
+            <p class="text-xs text-error mt-1">{{ $message }}</p>
+        @enderror
     </div>
     <div>
         <label class="field-label">Tipo de producto</label>
@@ -181,6 +224,10 @@
             <option value="{{ \App\Models\Product::TYPE_SIMPLE }}" @selected($selectedType === \App\Models\Product::TYPE_SIMPLE)>Simple</option>
             <option value="{{ \App\Models\Product::TYPE_KIT }}" @selected($selectedType === \App\Models\Product::TYPE_KIT)>Kit</option>
             <option value="{{ \App\Models\Product::TYPE_VARIANT }}" @selected($selectedType === \App\Models\Product::TYPE_VARIANT)>Variante</option>
+            <option value="{{ \App\Models\Product::TYPE_SERVICE }}" @selected($selectedType === \App\Models\Product::TYPE_SERVICE)>Servicio (sin inventario)</option>
+            <option value="{{ \App\Models\Product::TYPE_DIGITAL }}" @selected($selectedType === \App\Models\Product::TYPE_DIGITAL)>Digital (sin inventario)</option>
+            <option value="{{ \App\Models\Product::TYPE_SERIALIZED }}" @selected($selectedType === \App\Models\Product::TYPE_SERIALIZED)>Serializado</option>
+            <option value="{{ \App\Models\Product::TYPE_BATCH }}" @selected($selectedType === \App\Models\Product::TYPE_BATCH)>Lote y vencimiento</option>
         </select>
         @error('product_type')
             <p class="text-xs text-error mt-1">{{ $message }}</p>
@@ -234,6 +281,61 @@
         <label class="field-label">Descripcion</label>
         <input name="description" value="{{ old('description', $product->description ?? '') }}" class="input input-bordered w-full">
     </div>
+    <div id="digital-fields" class="sm:col-span-2">
+        <label class="field-label">Instrucciones de entrega digital</label>
+        <textarea name="delivery_instructions" rows="4" class="textarea textarea-bordered w-full" placeholder="Enlace, licencia o instrucciones que deben entregarse al cliente.">{{ old('delivery_instructions', $product->delivery_instructions ?? '') }}</textarea>
+        <p class="mt-1 text-xs text-base-content/60">Solo se usa para productos digitales.</p>
+    </div>
+</div>
+
+<div
+    id="product-remote-scanner-modal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
+    data-session-url="{{ route('pos.scanner.session') }}"
+    data-poll-base-url="{{ url('pos/scanner/session') }}"
+    data-csrf-token="{{ csrf_token() }}"
+>
+    <div class="w-full max-w-lg rounded-xl bg-base-100 p-4 shadow-xl">
+        <div class="mb-3 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold">Celular como lector</h2>
+                <p class="text-xs text-base-content/60">Cada nuevo escaneo reemplaza el codigo anterior.</p>
+            </div>
+            <button id="close-product-remote-scanner" type="button" class="btn btn-outline btn-sm">Cerrar</button>
+        </div>
+        <input id="product-remote-scanner-url" type="text" class="input input-bordered w-full text-xs" readonly value="Generando enlace...">
+        <div class="mt-3 flex flex-wrap gap-2">
+            <button id="copy-product-remote-scanner-url" type="button" class="btn btn-outline btn-sm">Copiar enlace</button>
+            <a id="launch-product-remote-scanner" class="btn btn-primary btn-sm" href="#" target="_blank" rel="noopener">Abrir escaner</a>
+        </div>
+        <p id="product-remote-scanner-status" class="mt-2 text-xs text-base-content/60">Preparando lector. Puedes escanear varias veces hasta dejar el codigo correcto.</p>
+    </div>
+</div>
+
+<div id="product-barcode-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="w-full max-w-md rounded-xl bg-base-100 p-4 shadow-xl">
+        <div class="mb-3 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold">Escanear codigo de barras</h2>
+                <p class="text-xs text-base-content/60">Usa la camara trasera y centra toda la barra.</p>
+            </div>
+            <button id="close-product-barcode-scanner" type="button" class="btn btn-outline btn-sm">Cerrar</button>
+        </div>
+        <video id="product-barcode-preview" autoplay muted playsinline class="h-64 w-full rounded-xl bg-black object-cover"></video>
+        <p id="product-barcode-status" class="mt-2 text-xs text-base-content/60">Camara detenida.</p>
+    </div>
+</div>
+
+<div id="kit-mode-fields" class="mt-6 hidden">
+    <label class="field-label">¿El kit maneja grupos de componentes?</label>
+    <select id="uses_component_groups" name="uses_component_groups" class="select select-bordered w-full max-w-md">
+        <option value="0" @selected($usesComponentGroups === '0')>No, usar componentes directos</option>
+        <option value="1" @selected($usesComponentGroups === '1')>Sí, usar grupos de componentes</option>
+    </select>
+    <p class="mt-1 text-xs text-base-content/60">Los dos modos son exclusivos para evitar descontar el inventario dos veces.</p>
+    @error('uses_component_groups')
+        <p class="mt-1 text-xs text-error">{{ $message }}</p>
+    @enderror
 </div>
 
 <div id="kit-fields" class="mt-6 hidden">
@@ -248,9 +350,12 @@
     @error('kit_items')
         <p class="text-xs text-error mt-2">{{ $message }}</p>
     @enderror
+    @if ($errors->has('kit_items.*'))
+        <p class="text-xs text-error mt-2">{{ $errors->first('kit_items.*') }}</p>
+    @endif
 </div>
 
-<div id="modifier-fields" class="mt-6">
+<div id="modifier-fields" class="mt-6 hidden">
     <div class="flex items-center justify-between">
         <div>
             <h3 class="text-sm font-semibold">Componentes y elecciones del cliente</h3>
@@ -259,6 +364,9 @@
         <button type="button" class="btn btn-outline btn-xs" id="add-modifier-group">Agregar grupo</button>
     </div>
     <div id="modifier-groups-wrapper" class="mt-3 space-y-4"></div>
+    @error('modifier_groups')
+        <p class="mt-2 text-xs text-error">{{ $message }}</p>
+    @enderror
 </div>
 
 <div class="mt-6 flex gap-2">
@@ -270,12 +378,17 @@
     <div class="grid grid-cols-1 gap-2 items-end sm:grid-cols-12 kit-item-row">
         <div class="sm:col-span-5">
             <label class="field-label">Componente</label>
-            <select class="select select-bordered w-full component-input">
-                <option value="">Selecciona un producto</option>
-                @foreach ($kitComponentCandidates as $candidate)
-                    <option value="{{ $candidate->id }}" data-unit="{{ $candidate->unit }}">{{ $candidate->name }} ({{ $candidate->sku }})</option>
-                @endforeach
-            </select>
+            <div class="relative component-autocomplete">
+                <input type="hidden" class="component-input">
+                <input
+                    type="text"
+                    class="input input-bordered w-full component-search"
+                    placeholder="Buscar por nombre, SKU o codigo"
+                    autocomplete="off"
+                >
+                <p class="mt-1 hidden text-xs text-error component-selection-error">Selecciona un producto de la lista.</p>
+                <div class="component-results absolute z-40 mt-1 hidden max-h-60 w-full overflow-y-auto rounded-xl border border-base-300 bg-base-100 shadow-lg"></div>
+            </div>
         </div>
         <div class="sm:col-span-2">
             <label class="field-label">Consumo visible</label>
@@ -283,11 +396,17 @@
         </div>
         <div class="sm:col-span-2">
             <label class="field-label">Unidad visible</label>
-            <input type="text" class="input input-bordered w-full component-unit-input" placeholder="g, ml, und">
+            <select class="select select-bordered w-full component-unit-input">
+                <option value="">Usar unidad del componente</option>
+                @foreach ($unitOptions as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
         </div>
         <div class="sm:col-span-2">
             <label class="field-label">Factor a stock</label>
             <input type="number" min="0.000001" step="0.000001" class="input input-bordered w-full component-factor-input" value="1">
+            <p class="mt-1 text-[11px] text-base-content/60 factor-help">Automatico cuando las unidades son compatibles.</p>
         </div>
         <div class="sm:col-span-1">
             <button type="button" class="btn btn-outline-danger btn-xs remove-kit-item">X</button>
@@ -360,11 +479,17 @@
         </div>
         <div>
             <label class="field-label">Unidad visible</label>
-            <input type="text" class="input input-bordered w-full modifier-option-unit" placeholder="g, ml, und">
+            <select class="select select-bordered w-full modifier-option-unit">
+                <option value="">Usar unidad del producto</option>
+                @foreach ($unitOptions as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
         </div>
         <div>
             <label class="field-label">Factor a stock</label>
             <input type="number" min="0.000001" step="0.000001" class="input input-bordered w-full modifier-option-factor" value="1">
+            <p class="mt-1 text-[11px] text-base-content/60 factor-help">Automatico cuando las unidades son compatibles.</p>
         </div>
         <div>
             <label class="field-label">Extra</label>
@@ -394,26 +519,84 @@
     (function () {
         const typeSelect = document.getElementById('product_type');
         const variantFields = document.getElementById('variant-fields');
+        const kitModeFields = document.getElementById('kit-mode-fields');
         const kitFields = document.getElementById('kit-fields');
+        const usesComponentGroupsSelect = document.getElementById('uses_component_groups');
+        const modifierFields = document.getElementById('modifier-fields');
+        const digitalFields = document.getElementById('digital-fields');
         const wrapper = document.getElementById('kit-items-wrapper');
         const addBtn = document.getElementById('add-kit-item');
         const template = document.getElementById('kit-item-template');
         const initialItems = @json($kitItems);
+        const kitComponentCandidates = @json($kitComponentOptions);
         const modifierGroupsWrapper = document.getElementById('modifier-groups-wrapper');
         const addModifierGroupBtn = document.getElementById('add-modifier-group');
         const modifierGroupTemplate = document.getElementById('modifier-group-template');
         const modifierOptionTemplate = document.getElementById('modifier-option-template');
         const initialModifierGroups = @json($modifierGroups);
+        const gramsPerUnit = {
+            g: 1,
+            kg: 1000,
+            libra: 500,
+        };
+
+        function automaticUnitFactor(fromUnit, toUnit) {
+            if (!fromUnit || !toUnit) {
+                return null;
+            }
+            if (fromUnit === toUnit) {
+                return 1;
+            }
+            if (!(fromUnit in gramsPerUnit) || !(toUnit in gramsPerUnit)) {
+                return null;
+            }
+
+            return gramsPerUnit[fromUnit] / gramsPerUnit[toUnit];
+        }
+
+        function syncFactorInput(unitInput, productInput, factorInput) {
+            const selected = productInput.tagName === 'SELECT'
+                ? productInput.options[productInput.selectedIndex]
+                : productInput;
+            const stockUnit = selected?.dataset.unit || '';
+            const visibleUnit = unitInput.value || stockUnit;
+            const automaticFactor = automaticUnitFactor(visibleUnit, stockUnit);
+            const help = factorInput.parentElement.querySelector('.factor-help');
+
+            if (automaticFactor !== null) {
+                factorInput.value = automaticFactor.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+                factorInput.readOnly = true;
+                if (help) {
+                    help.textContent = `Automatico: 1 ${visibleUnit} = ${factorInput.value} ${stockUnit}.`;
+                }
+                return;
+            }
+
+            factorInput.readOnly = false;
+            if (help) {
+                help.textContent = 'Indica manualmente cuanto equivale en la unidad de inventario.';
+            }
+        }
 
         function toggleSections() {
             const type = typeSelect.value;
+            const isKit = type === '{{ \App\Models\Product::TYPE_KIT }}';
+            if (! isKit) {
+                usesComponentGroupsSelect.value = '0';
+            }
+            const usesGroups = isKit && usesComponentGroupsSelect.value === '1';
             variantFields.classList.toggle('hidden', type !== '{{ \App\Models\Product::TYPE_VARIANT }}');
-            kitFields.classList.toggle('hidden', type !== '{{ \App\Models\Product::TYPE_KIT }}');
+            kitModeFields.classList.toggle('hidden', ! isKit);
+            kitFields.classList.toggle('hidden', ! isKit || usesGroups);
+            modifierFields.classList.toggle('hidden', ! usesGroups);
+            digitalFields.classList.toggle('hidden', type !== '{{ \App\Models\Product::TYPE_DIGITAL }}');
             updateInputNames();
+            updateModifierInputNames();
         }
 
         function updateInputNames() {
-            const isKit = typeSelect.value === '{{ \App\Models\Product::TYPE_KIT }}';
+            const isKit = typeSelect.value === '{{ \App\Models\Product::TYPE_KIT }}'
+                && usesComponentGroupsSelect.value !== '1';
             const rows = wrapper.querySelectorAll('.kit-item-row');
             rows.forEach((row, index) => {
                 const componentInput = row.querySelector('.component-input');
@@ -438,6 +621,9 @@
         function createRow(item = null) {
             const node = template.content.firstElementChild.cloneNode(true);
             const componentInput = node.querySelector('.component-input');
+            const componentSearch = node.querySelector('.component-search');
+            const componentResults = node.querySelector('.component-results');
+            const componentSelectionError = node.querySelector('.component-selection-error');
             const quantityInput = node.querySelector('.quantity-input');
             const componentUnitInput = node.querySelector('.component-unit-input');
             const componentFactorInput = node.querySelector('.component-factor-input');
@@ -448,18 +634,87 @@
                 quantityInput.value = item.quantity ?? '1';
                 componentUnitInput.value = item.component_unit ?? '';
                 componentFactorInput.value = item.component_unit_factor ?? '1';
+
+                const selectedCandidate = kitComponentCandidates.find(candidate => String(candidate.id) === String(componentInput.value));
+                if (selectedCandidate) {
+                    componentSearch.value = `${selectedCandidate.name} (${selectedCandidate.sku})`;
+                    componentInput.dataset.unit = selectedCandidate.unit || '';
+                }
             }
 
-            componentInput.addEventListener('change', function () {
-                const selected = componentInput.options[componentInput.selectedIndex];
-                if (!selected) {
-                    return;
+            function selectComponent(candidate) {
+                componentInput.value = candidate.id;
+                componentInput.dataset.unit = candidate.unit || '';
+                componentSearch.value = `${candidate.name} (${candidate.sku})`;
+                componentSearch.setCustomValidity('');
+                componentSelectionError.classList.add('hidden');
+                componentResults.classList.add('hidden');
+
+                if (componentUnitInput.value.trim() === '' && candidate.unit) {
+                    componentUnitInput.value = candidate.unit;
+                }
+                syncFactorInput(componentUnitInput, componentInput, componentFactorInput);
+            }
+
+            function renderComponentResults() {
+                const term = componentSearch.value.trim().toLowerCase();
+                const matches = kitComponentCandidates
+                    .filter(candidate => {
+                        if (term === '') {
+                            return true;
+                        }
+
+                        return [candidate.name, candidate.sku, candidate.barcode]
+                            .some(value => String(value || '').toLowerCase().includes(term));
+                    })
+                    .slice(0, 12);
+
+                componentResults.innerHTML = '';
+                matches.forEach(candidate => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'block w-full px-3 py-2 text-left text-sm hover:bg-base-200';
+                    button.innerHTML = `<span class="font-medium"></span><span class="ml-2 text-xs text-base-content/60"></span>`;
+                    button.querySelector('.font-medium').textContent = candidate.name;
+                    button.querySelector('.text-xs').textContent = [
+                        candidate.sku ? `SKU ${candidate.sku}` : '',
+                        candidate.barcode ? `Codigo ${candidate.barcode}` : '',
+                    ].filter(Boolean).join(' - ');
+                    button.addEventListener('mousedown', event => {
+                        event.preventDefault();
+                        selectComponent(candidate);
+                    });
+                    componentResults.appendChild(button);
+                });
+
+                if (matches.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'px-3 py-2 text-xs text-base-content/60';
+                    empty.textContent = 'Sin coincidencias';
+                    componentResults.appendChild(empty);
                 }
 
-                if (componentUnitInput.value.trim() === '' && selected.dataset.unit) {
-                    componentUnitInput.value = selected.dataset.unit;
+                componentResults.classList.remove('hidden');
+            }
+
+            componentSearch.addEventListener('focus', renderComponentResults);
+            componentSearch.addEventListener('input', () => {
+                componentInput.value = '';
+                componentInput.dataset.unit = '';
+                componentSearch.setCustomValidity('');
+                componentSelectionError.classList.add('hidden');
+                renderComponentResults();
+            });
+            componentSearch.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    componentResults.classList.add('hidden');
                 }
             });
+            componentSearch.addEventListener('blur', () => {
+                window.setTimeout(() => componentResults.classList.add('hidden'), 100);
+            });
+            componentUnitInput.addEventListener('change', () => syncFactorInput(componentUnitInput, componentInput, componentFactorInput));
+            syncFactorInput(componentUnitInput, componentInput, componentFactorInput);
 
             removeBtn.addEventListener('click', function () {
                 node.remove();
@@ -475,6 +730,37 @@
         });
 
         typeSelect.addEventListener('change', toggleSections);
+        usesComponentGroupsSelect.addEventListener('change', toggleSections);
+
+        typeSelect.closest('form').addEventListener('submit', event => {
+            if (
+                typeSelect.value !== '{{ \App\Models\Product::TYPE_KIT }}'
+                || usesComponentGroupsSelect.value === '1'
+            ) {
+                return;
+            }
+
+            let firstInvalidSearch = null;
+            wrapper.querySelectorAll('.kit-item-row').forEach(row => {
+                const componentInput = row.querySelector('.component-input');
+                const componentSearch = row.querySelector('.component-search');
+                const componentSelectionError = row.querySelector('.component-selection-error');
+                const hasSelection = componentInput.value !== '';
+
+                componentSearch.setCustomValidity(hasSelection ? '' : 'Selecciona un producto de la lista.');
+                componentSelectionError.classList.toggle('hidden', hasSelection);
+
+                if (! hasSelection && firstInvalidSearch === null) {
+                    firstInvalidSearch = componentSearch;
+                }
+            });
+
+            if (firstInvalidSearch) {
+                event.preventDefault();
+                firstInvalidSearch.reportValidity();
+                firstInvalidSearch.focus();
+            }
+        });
 
         if (initialItems.length > 0) {
             initialItems.forEach(item => createRow(item));
@@ -485,7 +771,13 @@
         toggleSections();
 
         function updateModifierInputNames() {
+            if (! modifierGroupsWrapper) {
+                return;
+            }
+
             const groups = modifierGroupsWrapper.querySelectorAll('.modifier-group-row');
+            const usesGroups = typeSelect.value === '{{ \App\Models\Product::TYPE_KIT }}'
+                && usesComponentGroupsSelect.value === '1';
             groups.forEach((groupRow, groupIndex) => {
                 const nameInput = groupRow.querySelector('.modifier-group-name');
                 const typeInput = groupRow.querySelector('.modifier-group-type');
@@ -493,24 +785,24 @@
                 const minInput = groupRow.querySelector('.modifier-group-min');
                 const maxInput = groupRow.querySelector('.modifier-group-max');
                 const hiddenIdInput = groupRow.querySelector('.modifier-group-id');
-                hiddenIdInput.name = `modifier_groups[${groupIndex}][id]`;
-                nameInput.name = `modifier_groups[${groupIndex}][name]`;
-                typeInput.name = `modifier_groups[${groupIndex}][selection_type]`;
-                requiredInput.name = `modifier_groups[${groupIndex}][is_required]`;
-                minInput.name = `modifier_groups[${groupIndex}][min_select]`;
-                maxInput.name = `modifier_groups[${groupIndex}][max_select]`;
+                hiddenIdInput.name = usesGroups ? `modifier_groups[${groupIndex}][id]` : '';
+                nameInput.name = usesGroups ? `modifier_groups[${groupIndex}][name]` : '';
+                typeInput.name = usesGroups ? `modifier_groups[${groupIndex}][selection_type]` : '';
+                requiredInput.name = usesGroups ? `modifier_groups[${groupIndex}][is_required]` : '';
+                minInput.name = usesGroups ? `modifier_groups[${groupIndex}][min_select]` : '';
+                maxInput.name = usesGroups ? `modifier_groups[${groupIndex}][max_select]` : '';
 
                 const optionRows = groupRow.querySelectorAll('.modifier-option-row');
                 optionRows.forEach((optionRow, optionIndex) => {
-                    optionRow.querySelector('.modifier-option-id').name = `modifier_groups[${groupIndex}][options][${optionIndex}][id]`;
-                    optionRow.querySelector('.modifier-option-product').name = `modifier_groups[${groupIndex}][options][${optionIndex}][product_id]`;
-                    optionRow.querySelector('.modifier-option-quantity').name = `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_quantity]`;
-                    optionRow.querySelector('.modifier-option-unit').name = `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_unit]`;
-                    optionRow.querySelector('.modifier-option-factor').name = `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_unit_factor]`;
-                    optionRow.querySelector('.modifier-option-label').name = `modifier_groups[${groupIndex}][options][${optionIndex}][label]`;
-                    optionRow.querySelector('.modifier-option-price').name = `modifier_groups[${groupIndex}][options][${optionIndex}][price_delta]`;
-                    optionRow.querySelector('.modifier-option-default').name = `modifier_groups[${groupIndex}][options][${optionIndex}][is_default]`;
-                    optionRow.querySelector('.modifier-option-active').name = `modifier_groups[${groupIndex}][options][${optionIndex}][is_active]`;
+                    optionRow.querySelector('.modifier-option-id').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][id]` : '';
+                    optionRow.querySelector('.modifier-option-product').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][product_id]` : '';
+                    optionRow.querySelector('.modifier-option-quantity').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_quantity]` : '';
+                    optionRow.querySelector('.modifier-option-unit').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_unit]` : '';
+                    optionRow.querySelector('.modifier-option-factor').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][inventory_unit_factor]` : '';
+                    optionRow.querySelector('.modifier-option-label').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][label]` : '';
+                    optionRow.querySelector('.modifier-option-price').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][price_delta]` : '';
+                    optionRow.querySelector('.modifier-option-default').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][is_default]` : '';
+                    optionRow.querySelector('.modifier-option-active').name = usesGroups ? `modifier_groups[${groupIndex}][options][${optionIndex}][is_active]` : '';
                 });
             });
         }
@@ -554,6 +846,7 @@
             const productInput = optionRow.querySelector('.modifier-option-product');
             const labelInput = optionRow.querySelector('.modifier-option-label');
             const unitInput = optionRow.querySelector('.modifier-option-unit');
+            const factorInput = optionRow.querySelector('.modifier-option-factor');
             const removeBtn = optionRow.querySelector('.remove-modifier-option');
 
             productInput.addEventListener('change', function () {
@@ -562,6 +855,7 @@
                     if (unitInput.value.trim() === '' && selected && selected.dataset.unit) {
                         unitInput.value = selected.dataset.unit;
                     }
+                    syncFactorInput(unitInput, productInput, factorInput);
                     return;
                 }
                 const selected = productInput.options[productInput.selectedIndex];
@@ -573,7 +867,10 @@
                 if (unitInput.value.trim() === '' && selected.dataset.unit) {
                     unitInput.value = selected.dataset.unit;
                 }
+                syncFactorInput(unitInput, productInput, factorInput);
             });
+            unitInput.addEventListener('change', () => syncFactorInput(unitInput, productInput, factorInput));
+            syncFactorInput(unitInput, productInput, factorInput);
 
             removeBtn.addEventListener('click', function () {
                 optionRow.remove();
@@ -608,6 +905,10 @@
         }
 
         function createModifierGroup(group = null) {
+            if (! modifierGroupsWrapper || ! modifierGroupTemplate || ! modifierOptionTemplate) {
+                return;
+            }
+
             const groupRow = modifierGroupTemplate.content.firstElementChild.cloneNode(true);
             const hiddenIdInput = document.createElement('input');
             hiddenIdInput.type = 'hidden';
@@ -651,15 +952,18 @@
             updateModifierInputNames();
         }
 
-        addModifierGroupBtn.addEventListener('click', function () {
-            createModifierGroup();
-        });
+        if (addModifierGroupBtn && modifierGroupsWrapper && modifierGroupTemplate && modifierOptionTemplate) {
+            addModifierGroupBtn.addEventListener('click', function () {
+                createModifierGroup();
+            });
 
-        if (initialModifierGroups.length > 0) {
-            initialModifierGroups.forEach(group => createModifierGroup(group));
+            if (initialModifierGroups.length > 0) {
+                initialModifierGroups.forEach(group => createModifierGroup(group));
+            }
         }
     })();
 </script>
+@vite('resources/js/product-barcode-scanner.js')
 <script>
     (function () {
         const fileInput = document.getElementById('image_file');

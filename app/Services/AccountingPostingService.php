@@ -437,7 +437,9 @@ class AccountingPostingService
             }
 
             $lineQty = (float) $item->quantity;
-            if ($product->product_type === Product::TYPE_KIT) {
+            if (! $product->tracksInventory()) {
+                continue;
+            } elseif ($product->product_type === Product::TYPE_KIT) {
                 foreach ($product->kitItems as $kitItem) {
                     $component = $kitItem->componentProduct;
                     if (! $component) {
@@ -471,7 +473,9 @@ class AccountingPostingService
             }
 
             $lineQty = (float) $item->quantity;
-            if ($product->product_type === Product::TYPE_KIT) {
+            if (! $product->tracksInventory()) {
+                continue;
+            } elseif ($product->product_type === Product::TYPE_KIT) {
                 foreach ($product->kitItems as $kitItem) {
                     $component = $kitItem->componentProduct;
                     if (! $component) {

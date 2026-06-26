@@ -24,7 +24,7 @@
                     <div class="d-flex flex-column gap-3">
                         @foreach ($steps as $step)
                             <div class="d-flex align-items-start gap-3 rounded-4 border px-3 py-3 {{ $step['completed'] ? 'border-success-subtle bg-success-subtle' : 'border-secondary-subtle bg-body' }}">
-                                <div class="fs-5 lh-1 mt-1">{{ $step['completed'] ? '☑' : '☐' }}</div>
+                                <div class="fs-5 lh-1 mt-1">{{ $step['completed'] ? '[x]' : '[ ]' }}</div>
                                 <div>
                                     <div class="fw-semibold">{{ $step['label'] }}</div>
                                     <div class="text-muted small">{{ $step['completed'] ? 'Completado en la fase actual.' : 'Pendiente en siguientes fases.' }}</div>

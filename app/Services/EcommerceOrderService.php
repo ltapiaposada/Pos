@@ -7,9 +7,11 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\Setting;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Support\UnitConverter;
 
 class EcommerceOrderService
 {
@@ -110,6 +112,9 @@ class EcommerceOrderService
                     'product_name' => $cartItem['display_name'] ?? $product->name,
                     'sku' => $product->sku,
                     'barcode' => $product->barcode,
+                    'delivery_instructions' => $product->product_type === Product::TYPE_DIGITAL
+                        ? $product->delivery_instructions
+                        : null,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount_type' => null,
@@ -121,8 +126,9 @@ class EcommerceOrderService
                 ];
             }
 
-            $shippingTotal = (float) config('pos.ecommerce_flat_shipping', 0);
-            [$normalizedCouponCode, $couponDiscountTotal] = $this->resolveCouponDiscount($couponCode, $subtotal);
+            $business = $this->resolveBusinessSettings($branch->company_id);
+            $shippingTotal = $this->resolveShippingTotal($business);
+            [$normalizedCouponCode, $couponDiscountTotal] = $this->resolveCouponDiscount($couponCode, $subtotal, $business);
             $total = max(0, $subtotal + $taxTotal + $shippingTotal - $couponDiscountTotal);
 
             $lastNumber = DB::table('sales')
@@ -134,6 +140,7 @@ class EcommerceOrderService
             $normalizedReference = trim((string) $paymentReference);
             $normalizedReference = $normalizedReference !== '' ? $normalizedReference : null;
             $composedNote = $this->composeCustomerNote($customerNote, $normalizedReference);
+            $currency = $this->resolveCurrency($branch->company_id);
 
             $sale = Sale::query()->create([
                 'company_id' => $branch->company_id,
@@ -153,9 +160,9 @@ class EcommerceOrderService
                 'delivery_address' => $deliveryAddress,
                 'customer_note' => $composedNote,
                 'total' => $total,
-                'paid_total' => $total,
+                'paid_total' => 0,
                 'change_total' => 0,
-                'currency' => config('pos.default_currency', 'USD'),
+                'currency' => $currency,
                 'sold_at' => now(),
             ]);
 
@@ -165,7 +172,7 @@ class EcommerceOrderService
                 $inventoryComponents = $line['inventory_components'] ?? [];
                 unset($line['inventory_components']);
 
-                SaleItem::query()->create([
+                $saleItem = SaleItem::query()->create([
                     ...$line,
                     'company_id' => $branch->company_id,
                     'sale_id' => $sale->id,
@@ -179,6 +186,12 @@ class EcommerceOrderService
                     saleId: $sale->id,
                     lineQuantity: (float) $line['quantity'],
                     extraComponents: $inventoryComponents
+                );
+                app(InventoryTrackingService::class)->consume(
+                    product: $product,
+                    branchId: $branch->id,
+                    saleItem: $saleItem,
+                    quantity: (float) $line['quantity']
                 );
             }
 
@@ -195,14 +208,14 @@ class EcommerceOrderService
         });
     }
 
-    private function resolveCouponDiscount(?string $couponCode, float $subtotal): array
+    private function resolveCouponDiscount(?string $couponCode, float $subtotal, array $business): array
     {
         $code = strtoupper(trim((string) $couponCode));
         if ($code === '') {
             return [null, 0.0];
         }
 
-        $coupons = (array) config('pos.ecommerce_coupons', []);
+        $coupons = $this->resolveCoupons($business);
         $discountPercent = (float) ($coupons[$code] ?? 0);
 
         if ($discountPercent <= 0) {
@@ -271,7 +284,9 @@ class EcommerceOrderService
     {
         $requirements = [];
 
-        if ($product->product_type === Product::TYPE_KIT) {
+        if (! $product->tracksInventory()) {
+            $requirements = [];
+        } elseif ($product->product_type === Product::TYPE_KIT) {
             if ($product->kitItems->isEmpty()) {
                 throw ValidationException::withMessages([
                     'cart' => "El kit {$product->name} no tiene componentes configurados.",
@@ -279,8 +294,13 @@ class EcommerceOrderService
             }
 
             foreach ($product->kitItems as $kitItem) {
+                $factor = UnitConverter::resolveFactor(
+                    $kitItem->component_unit,
+                    $kitItem->componentProduct?->unit,
+                    (float) ($kitItem->component_unit_factor ?? 1)
+                );
                 $requirements[$kitItem->component_product_id] = ($requirements[$kitItem->component_product_id] ?? 0)
-                    + (((float) $kitItem->quantity * (float) ($kitItem->component_unit_factor ?? 1)) * $lineQuantity);
+                    + (((float) $kitItem->quantity * $factor) * $lineQuantity);
             }
         } else {
             $requirements[$product->id] = ($requirements[$product->id] ?? 0) + $lineQuantity;
@@ -317,5 +337,43 @@ class EcommerceOrderService
         }
 
         return trim($base.' | '.$referenceNote);
+    }
+
+    private function resolveCurrency(?int $companyId): string
+    {
+        $business = $this->resolveBusinessSettings($companyId);
+        $currency = is_array($business) ? trim((string) ($business['currency'] ?? '')) : '';
+
+        return $currency !== '' ? $currency : config('pos.default_currency', 'USD');
+    }
+
+    private function resolveBusinessSettings(?int $companyId): array
+    {
+        $business = Setting::getValue('business', [], $companyId);
+
+        return is_array($business) ? $business : [];
+    }
+
+    private function resolveShippingTotal(array $business): float
+    {
+        return round((float) ($business['ecommerce_flat_shipping'] ?? config('pos.ecommerce_flat_shipping', 0)), 2);
+    }
+
+    private function resolveCoupons(array $business): array
+    {
+        $configuredCoupons = $business['ecommerce_coupons'] ?? config('pos.ecommerce_coupons', []);
+
+        return collect(is_array($configuredCoupons) ? $configuredCoupons : [])
+            ->mapWithKeys(function ($percent, $code) {
+                $normalizedCode = strtoupper(trim((string) $code));
+                $normalizedPercent = (float) $percent;
+
+                if ($normalizedCode === '' || $normalizedPercent <= 0) {
+                    return [];
+                }
+
+                return [$normalizedCode => $normalizedPercent];
+            })
+            ->all();
     }
 }

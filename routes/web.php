@@ -14,6 +14,9 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EcommerceOrderManagementController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ImplementationProgressController;
+use App\Http\Controllers\ClinicalRecordController;
+use App\Http\Controllers\MedicalOrderController;
+use App\Http\Controllers\OptometryPatientController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\ProductController;
@@ -89,8 +92,8 @@ Route::middleware(['auth', 'admin.user', 'active.subscription'])->group(function
     Route::get('pos', [PosController::class, 'index'])->name('pos.index')->middleware(['permission:create_sale', 'pos.company']);
     Route::get('pos/products', [PosController::class, 'products'])->name('pos.products')->middleware(['permission:create_sale', 'pos.company']);
     Route::get('pos/products/resolve', [PosController::class, 'resolveProduct'])->name('pos.products.resolve')->middleware(['permission:create_sale', 'pos.company']);
-    Route::post('pos/scanner/session', [PosController::class, 'createScannerSession'])->name('pos.scanner.session')->middleware(['permission:create_sale', 'pos.company']);
-    Route::get('pos/scanner/session/{token}/poll', [PosController::class, 'pollScannerSession'])->name('pos.scanner.poll')->middleware(['permission:create_sale', 'pos.company']);
+    Route::post('pos/scanner/session', [PosController::class, 'createScannerSession'])->name('pos.scanner.session')->middleware('permission:create_sale|manage_products');
+    Route::get('pos/scanner/session/{token}/poll', [PosController::class, 'pollScannerSession'])->name('pos.scanner.poll')->middleware('permission:create_sale|manage_products');
     Route::post('pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout')->middleware(['permission:create_sale', 'pos.company']);
 
     Route::prefix('restaurant')->name('restaurant.')->middleware(['permission:manage_restaurant', 'restaurant.company'])->group(function () {
@@ -114,6 +117,32 @@ Route::middleware(['auth', 'admin.user', 'active.subscription'])->group(function
         Route::get('/', [RestaurantKitchenController::class, 'index'])->name('index');
         Route::patch('items/{item}/status', [RestaurantKitchenController::class, 'updateItemStatus'])->name('items.status');
     });
+
+    Route::prefix('optometry')->name('optometry.')->middleware(['optic.company'])->group(function () {
+        Route::get('patients', [OptometryPatientController::class, 'index'])->name('patients.index')->middleware('permission:manage_optometry_patients');
+        Route::get('patients/create', [OptometryPatientController::class, 'create'])->name('patients.create')->middleware('permission:manage_optometry_patients');
+        Route::post('patients', [OptometryPatientController::class, 'store'])->name('patients.store')->middleware('permission:manage_optometry_patients');
+        Route::get('patients/{patient}', [OptometryPatientController::class, 'show'])->name('patients.show')->middleware('permission:manage_optometry_patients');
+        Route::get('patients/{patient}/edit', [OptometryPatientController::class, 'edit'])->name('patients.edit')->middleware('permission:manage_optometry_patients');
+        Route::put('patients/{patient}', [OptometryPatientController::class, 'update'])->name('patients.update')->middleware('permission:manage_optometry_patients');
+
+        Route::get('records', [ClinicalRecordController::class, 'index'])->name('records.index')->middleware('permission:manage_optometry_records');
+        Route::get('records/create', [ClinicalRecordController::class, 'create'])->name('records.create')->middleware('permission:manage_optometry_records');
+        Route::post('records', [ClinicalRecordController::class, 'store'])->name('records.store')->middleware('permission:manage_optometry_records');
+        Route::get('records/{record}', [ClinicalRecordController::class, 'show'])->name('records.show')->middleware('permission:manage_optometry_records');
+        Route::get('records/{record}/edit', [ClinicalRecordController::class, 'edit'])->name('records.edit')->middleware('permission:manage_optometry_records');
+        Route::put('records/{record}', [ClinicalRecordController::class, 'update'])->name('records.update')->middleware('permission:manage_optometry_records');
+        Route::get('records/{record}/print', [ClinicalRecordController::class, 'print'])->name('records.print')->middleware('permission:manage_optometry_records');
+
+        Route::get('orders', [MedicalOrderController::class, 'index'])->name('orders.index')->middleware('permission:manage_optometry_orders');
+        Route::get('orders/create', [MedicalOrderController::class, 'create'])->name('orders.create')->middleware('permission:manage_optometry_orders');
+        Route::post('orders', [MedicalOrderController::class, 'store'])->name('orders.store')->middleware('permission:manage_optometry_orders');
+        Route::get('orders/{order}', [MedicalOrderController::class, 'show'])->name('orders.show')->middleware('permission:manage_optometry_orders');
+        Route::get('orders/{order}/edit', [MedicalOrderController::class, 'edit'])->name('orders.edit')->middleware('permission:manage_optometry_orders');
+        Route::put('orders/{order}', [MedicalOrderController::class, 'update'])->name('orders.update')->middleware('permission:manage_optometry_orders');
+        Route::get('orders/{order}/print', [MedicalOrderController::class, 'print'])->name('orders.print')->middleware('permission:manage_optometry_orders');
+    });
+
     Route::get('sales', [PosController::class, 'invoices'])->name('sales.index')->middleware('permission:create_sale');
     Route::get('sales/{sale}', [PosController::class, 'show'])->name('sales.show')->middleware('permission:create_sale');
     Route::get('sales/{sale}/ticket', [PosController::class, 'ticket'])->name('sales.ticket')->middleware('permission:create_sale');

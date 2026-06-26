@@ -128,6 +128,20 @@
                     <input name="currency" value="{{ old('currency', $business['currency'] ?? 'USD') }}" class="input input-bordered w-full" required>
                 </div>
                 <div>
+                    <label class="field-label">Envio fijo e-commerce</label>
+                    <input
+                        name="ecommerce_flat_shipping"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value="{{ old('ecommerce_flat_shipping', $business['ecommerce_flat_shipping'] ?? config('pos.ecommerce_flat_shipping', 0)) }}"
+                        class="input input-bordered w-full"
+                    >
+                    @error('ecommerce_flat_shipping')
+                        <p class="text-xs text-error mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
                     <label class="field-label">Impuesto por defecto</label>
                     <select name="default_tax_id" class="select select-bordered w-full">
                         <option value="">Sin impuesto</option>
@@ -135,6 +149,22 @@
                             <option value="{{ $tax->id }}" @selected(old('default_tax_id', $business['default_tax_id'] ?? null) == $tax->id)>{{ $tax->name }}</option>
                         @endforeach
                     </select>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="field-label">Cupones e-commerce</label>
+                    <textarea
+                        name="ecommerce_coupons_text"
+                        rows="4"
+                        class="textarea textarea-bordered w-full"
+                        placeholder="BIENVENIDO10=10&#10;PROMO15=15"
+                    >{{ old('ecommerce_coupons_text', $ecommerceCouponsText) }}</textarea>
+                    <p class="mt-1 text-xs text-base-content/60">Un cupon por linea con formato <code>CODIGO=PORCENTAJE</code>.</p>
+                    @error('ecommerce_coupons')
+                        <p class="text-xs text-error mt-1">{{ $message }}</p>
+                    @enderror
+                    @error('ecommerce_coupons.*')
+                        <p class="text-xs text-error mt-1">{{ $message }}</p>
+                    @enderror
                 </div>
                 <div class="sm:col-span-2">
                     <label class="inline-flex items-center gap-2 text-sm">

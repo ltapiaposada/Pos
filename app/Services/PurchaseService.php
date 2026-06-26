@@ -6,6 +6,8 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\Branch;
+use App\Models\InventoryLot;
+use App\Models\InventorySerial;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -67,6 +69,13 @@ class PurchaseService
                     'tax_rate' => $taxRate,
                     'tax_amount' => $taxAmount,
                     'line_total' => $lineTotal,
+                    'serial_numbers' => collect($item['serial_numbers'] ?? [])
+                        ->map(fn ($serial) => trim((string) $serial))
+                        ->filter()
+                        ->values()
+                        ->all(),
+                    'lot_number' => filled($item['lot_number'] ?? null) ? trim((string) $item['lot_number']) : null,
+                    'expires_at' => $item['expires_at'] ?? null,
                 ];
             }
 
@@ -111,23 +120,88 @@ class PurchaseService
             ]);
 
             foreach ($lineItems as $line) {
-                PurchaseItem::query()->create([
+                $tracking = [
+                    'serial_numbers' => $line['serial_numbers'],
+                    'lot_number' => $line['lot_number'],
+                    'expires_at' => $line['expires_at'],
+                ];
+                unset($line['serial_numbers'], $line['lot_number'], $line['expires_at']);
+
+                $purchaseItem = PurchaseItem::query()->create([
                     ...$line,
                     'company_id' => $companyId,
                     'purchase_id' => $purchase->id,
                 ]);
 
-                app(InventoryService::class)->adjust([
-                    'branch_id' => $branchId,
-                    'product_id' => $line['product_id'],
-                    'user_id' => $userId,
-                    'type' => 'IN',
-                    'quantity' => $line['quantity'],
-                    'cost_price' => $line['unit_cost'],
-                    'ref_type' => 'purchase',
-                    'ref_id' => $purchase->id,
-                    'notes' => 'Ingreso por compra',
-                ]);
+                $product = $products->get($line['product_id']);
+                if ($product->tracksInventory()) {
+                    app(InventoryService::class)->adjust([
+                        'branch_id' => $branchId,
+                        'product_id' => $line['product_id'],
+                        'user_id' => $userId,
+                        'type' => 'IN',
+                        'quantity' => $line['quantity'],
+                        'cost_price' => $line['unit_cost'],
+                        'ref_type' => 'purchase',
+                        'ref_id' => $purchase->id,
+                        'notes' => 'Ingreso por compra',
+                    ]);
+                }
+
+                if ($product->tracksSerials()) {
+                    $duplicateSerial = InventorySerial::query()
+                        ->where('product_id', $product->id)
+                        ->whereIn('serial_number', $tracking['serial_numbers'])
+                        ->exists();
+
+                    if ($duplicateSerial) {
+                        throw ValidationException::withMessages([
+                            'items' => "Uno de los seriales de {$product->name} ya existe.",
+                        ]);
+                    }
+
+                    foreach ($tracking['serial_numbers'] as $serialNumber) {
+                        InventorySerial::query()->create([
+                            'company_id' => $companyId,
+                            'branch_id' => $branchId,
+                            'product_id' => $product->id,
+                            'purchase_item_id' => $purchaseItem->id,
+                            'serial_number' => $serialNumber,
+                            'status' => InventorySerial::STATUS_AVAILABLE,
+                        ]);
+                    }
+                }
+
+                if ($product->tracksLots()) {
+                    $lot = InventoryLot::query()
+                        ->where('company_id', $companyId)
+                        ->where('branch_id', $branchId)
+                        ->where('product_id', $product->id)
+                        ->where('lot_number', $tracking['lot_number'])
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($lot) {
+                        $lot->update([
+                            'expires_at' => $tracking['expires_at'] ?: $lot->expires_at,
+                            'quantity' => (float) $lot->quantity + (float) $line['quantity'],
+                            'remaining_quantity' => (float) $lot->remaining_quantity + (float) $line['quantity'],
+                            'unit_cost' => $line['unit_cost'],
+                        ]);
+                    } else {
+                        InventoryLot::query()->create([
+                            'company_id' => $companyId,
+                            'branch_id' => $branchId,
+                            'product_id' => $product->id,
+                            'purchase_item_id' => $purchaseItem->id,
+                            'lot_number' => $tracking['lot_number'],
+                            'expires_at' => $tracking['expires_at'],
+                            'quantity' => $line['quantity'],
+                            'remaining_quantity' => $line['quantity'],
+                            'unit_cost' => $line['unit_cost'],
+                        ]);
+                    }
+                }
 
                 Product::query()->whereKey($line['product_id'])->update([
                     'cost_price' => $line['unit_cost'],

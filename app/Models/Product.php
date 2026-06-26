@@ -34,8 +34,10 @@ class Product extends Model
         'barcode',
         'image_url',
         'description',
+        'delivery_instructions',
         'unit',
         'product_type',
+        'uses_component_groups',
         'parent_product_id',
         'cost_price',
         'sale_price',
@@ -48,11 +50,61 @@ class Product extends Model
         'is_visible_ecommerce' => 'boolean',
         'cost_price' => 'decimal:2',
         'sale_price' => 'decimal:2',
+        'uses_component_groups' => 'boolean',
     ];
 
     public const TYPE_SIMPLE = 'simple';
     public const TYPE_KIT = 'kit';
     public const TYPE_VARIANT = 'variant';
+    public const TYPE_SERVICE = 'service';
+    public const TYPE_DIGITAL = 'digital';
+    public const TYPE_SERIALIZED = 'serialized';
+    public const TYPE_BATCH = 'batch';
+
+    public const TYPES = [
+        self::TYPE_SIMPLE,
+        self::TYPE_KIT,
+        self::TYPE_VARIANT,
+        self::TYPE_SERVICE,
+        self::TYPE_DIGITAL,
+        self::TYPE_SERIALIZED,
+        self::TYPE_BATCH,
+    ];
+
+    public static function unitOptions(): array
+    {
+        return [
+            'unit' => 'Unidad',
+            'und' => 'Unidad (und)',
+            'g' => 'Gramos (g)',
+            'kg' => 'Kilogramos (kg)',
+            'libra' => 'Libras (lb)',
+            'ml' => 'Mililitros (ml)',
+            'l' => 'Litros (l)',
+            'cm' => 'Centimetros (cm)',
+            'm' => 'Metros (m)',
+            'porcion' => 'Porcion',
+            'vaso' => 'Vaso',
+            'plato' => 'Plato',
+            'service' => 'Servicio',
+            'license' => 'Licencia',
+        ];
+    }
+
+    public function tracksInventory(): bool
+    {
+        return ! in_array($this->product_type, [self::TYPE_SERVICE, self::TYPE_DIGITAL], true);
+    }
+
+    public function tracksSerials(): bool
+    {
+        return $this->product_type === self::TYPE_SERIALIZED;
+    }
+
+    public function tracksLots(): bool
+    {
+        return $this->product_type === self::TYPE_BATCH;
+    }
 
     public function category()
     {

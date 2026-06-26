@@ -16,33 +16,36 @@ class EcommerceOrderManagementController extends Controller
     {
         $search = (string) $request->get('q', '');
         $status = (string) $request->get('status', '');
+        $isRestaurantService = \App\Support\CompanyContext::isRestaurantService($request->user()?->company);
 
-        $restaurantOrders = RestaurantOrder::query()
-            ->with(['customer', 'branch', 'table'])
-            ->where(function ($query) {
-                $query->where('notes', 'like', 'Origen: Pedido web restaurante%')
-                    ->orWhereIn('order_type', [
-                        RestaurantOrder::TYPE_DELIVERY,
-                        RestaurantOrder::TYPE_TAKEAWAY,
-                    ]);
-            })
-            ->whereNull('sale_id')
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($builder) use ($search) {
-                    $builder->where('order_number', 'like', "%{$search}%")
-                        ->orWhereHas('customer', fn ($q) => $q->where('name', 'like', "%{$search}%"))
-                        ->orWhere('notes', 'like', "%{$search}%");
-                });
-            })
-            ->when($status !== '' && array_key_exists($status, RestaurantOrder::statusOptions()), fn ($query) => $query->where('status', $status))
-            ->orderByDesc('opened_at')
-            ->orderByDesc('id')
-            ->limit(20)
-            ->get();
+        $restaurantOrders = $isRestaurantService
+            ? RestaurantOrder::query()
+                ->with(['customer', 'branch', 'table'])
+                ->where(function ($query) {
+                    $query->where('notes', 'like', 'Origen: Pedido web restaurante%')
+                        ->orWhereIn('order_type', [
+                            RestaurantOrder::TYPE_DELIVERY,
+                            RestaurantOrder::TYPE_TAKEAWAY,
+                        ]);
+                })
+                ->whereNull('sale_id')
+                ->when($search !== '', function ($query) use ($search) {
+                    $query->where(function ($builder) use ($search) {
+                        $builder->where('order_number', 'like', "%{$search}%")
+                            ->orWhereHas('customer', fn ($q) => $q->where('name', 'like', "%{$search}%"))
+                            ->orWhere('notes', 'like', "%{$search}%");
+                    });
+                })
+                ->when($status !== '' && array_key_exists($status, RestaurantOrder::statusOptions()), fn ($query) => $query->where('status', $status))
+                ->orderByDesc('opened_at')
+                ->orderByDesc('id')
+                ->limit(20)
+                ->get()
+            : collect();
 
         $query = Sale::query()
             ->with(['customer', 'branch', 'payments'])
-            ->where('order_source', Sale::SOURCE_ECOMMERCE)
+            ->where('order_source', $isRestaurantService ? Sale::SOURCE_RESTAURANT : Sale::SOURCE_ECOMMERCE)
             ->orderByDesc('sold_at')
             ->orderByDesc('id');
 
@@ -66,12 +69,13 @@ class EcommerceOrderManagementController extends Controller
             'statusOptions' => $this->statusOptions(),
             'saleStatusOptions' => $this->saleStatusOptions(),
             'restaurantStatusOptions' => RestaurantOrder::statusOptions(),
+            'isRestaurantService' => $isRestaurantService,
         ]);
     }
 
-    public function show(Sale $sale): View
+    public function show(Request $request, Sale $sale): View
     {
-        abort_unless($sale->order_source === Sale::SOURCE_ECOMMERCE, 404);
+        abort_unless($sale->order_source === $this->serviceSaleSource($request), 404);
 
         $sale->load(['items', 'payments', 'customer', 'branch', 'user']);
 
@@ -83,7 +87,7 @@ class EcommerceOrderManagementController extends Controller
 
     public function updateStatus(Request $request, Sale $sale): RedirectResponse
     {
-        abort_unless($sale->order_source === Sale::SOURCE_ECOMMERCE, 404);
+        abort_unless($sale->order_source === $this->serviceSaleSource($request), 404);
 
         $data = $request->validate([
             'status' => ['required', 'in:pending,processing,shipped,delivered,cancelled'],
@@ -91,6 +95,7 @@ class EcommerceOrderManagementController extends Controller
 
         $sale->update([
             'status' => $data['status'],
+            'paid_total' => $this->resolvedPaidTotalForStatus($sale, $data['status']),
         ]);
 
         return redirect()->route('ecommerce-admin.orders.show', $sale)->with('status', 'Estado del pedido actualizado.');
@@ -98,7 +103,13 @@ class EcommerceOrderManagementController extends Controller
 
     public function convertToInvoice(Request $request, Sale $sale, AccountingPostingService $postingService): RedirectResponse
     {
-        abort_unless($sale->order_source === Sale::SOURCE_ECOMMERCE, 404);
+        abort_unless($sale->order_source === $this->serviceSaleSource($request), 404);
+
+        if (! $this->canInvoiceSale($sale)) {
+            return redirect()
+                ->route('ecommerce-admin.orders.show', $sale)
+                ->withErrors(['order' => 'Valida el pago o completa la entrega antes de registrar la factura de este pedido.']);
+        }
 
         DB::transaction(function () use ($request, $sale, $postingService) {
             $sale->refresh();
@@ -140,12 +151,50 @@ class EcommerceOrderManagementController extends Controller
     private function saleStatusOptions(): array
     {
         return [
-            Sale::STATUS_PENDING => 'Pendiente',
-            Sale::STATUS_PROCESSING => 'Procesando',
-            Sale::STATUS_SHIPPED => 'Enviado',
+            Sale::STATUS_PAID => 'Pagada',
+            Sale::STATUS_PENDING => 'Recibido / por validar',
+            Sale::STATUS_PROCESSING => 'Confirmado',
+            Sale::STATUS_SHIPPED => 'Despachado',
             Sale::STATUS_DELIVERED => 'Entregado',
             Sale::STATUS_CANCELLED => 'Cancelado',
         ];
+    }
+
+    private function resolvedPaidTotalForStatus(Sale $sale, string $status): float
+    {
+        $method = (string) $sale->payments()->orderBy('id')->value('method');
+
+        if (in_array($method, ['transfer', 'qr'], true) && in_array($status, [Sale::STATUS_PROCESSING, Sale::STATUS_SHIPPED, Sale::STATUS_DELIVERED], true)) {
+            return (float) $sale->total;
+        }
+
+        if ($method === 'contraentrega' && $status === Sale::STATUS_DELIVERED) {
+            return (float) $sale->total;
+        }
+
+        return (float) $sale->paid_total;
+    }
+
+    private function canInvoiceSale(Sale $sale): bool
+    {
+        $method = (string) $sale->payments()->orderBy('id')->value('method');
+
+        if (in_array($method, ['transfer', 'qr'], true)) {
+            return in_array($sale->status, [Sale::STATUS_PROCESSING, Sale::STATUS_SHIPPED, Sale::STATUS_DELIVERED], true);
+        }
+
+        if ($method === 'contraentrega') {
+            return $sale->status === Sale::STATUS_DELIVERED;
+        }
+
+        return false;
+    }
+
+    private function serviceSaleSource(Request $request): string
+    {
+        return \App\Support\CompanyContext::isRestaurantService($request->user()?->company)
+            ? Sale::SOURCE_RESTAURANT
+            : Sale::SOURCE_ECOMMERCE;
     }
 }
 

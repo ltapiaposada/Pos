@@ -58,4 +58,19 @@ class Customer extends Model
     {
         return $this->hasMany(Sale::class);
     }
+
+    public function optometryProfile()
+    {
+        return $this->hasOne(OptometryPatientProfile::class);
+    }
+
+    public function clinicalRecords()
+    {
+        return $this->hasMany(ClinicalRecord::class);
+    }
+
+    public function medicalOrders()
+    {
+        return $this->hasMany(MedicalOrder::class);
+    }
 }

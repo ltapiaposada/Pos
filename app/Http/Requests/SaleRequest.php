@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Support\CompanyRules;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SaleRequest extends FormRequest
 {
@@ -38,12 +40,22 @@ class SaleRequest extends FormRequest
         return [
             'branch_id' => ['required', 'integer', CompanyRules::companyScoped('branches')],
             'customer_id' => ['required', 'integer', CompanyRules::companyScoped('customers')],
+            'medical_order_id' => [
+                'nullable',
+                Rule::prohibitedIf(fn () => ! CompanyContext::isOpticService($this->user()?->company)),
+                'integer',
+                CompanyRules::companyScoped('medical_orders'),
+            ],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', CompanyRules::companyScoped('products')],
             'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount_type' => ['nullable', 'in:percent,fixed'],
             'items.*.discount_value' => ['nullable', 'numeric', 'min:0'],
+            'items.*.modifier_selections' => ['nullable', 'array'],
+            'items.*.modifier_selections.*.group_id' => ['required', 'integer', CompanyRules::companyScoped('product_modifier_groups')],
+            'items.*.modifier_selections.*.option_id' => ['required', 'integer', CompanyRules::companyScoped('product_modifier_options')],
+            'items.*.modifier_selections.*.action' => ['nullable', 'in:include,remove'],
             'global_discount' => ['nullable', 'numeric', 'min:0'],
             'payments' => ['required', 'array', 'min:1'],
             'payments.*.method' => ['required', 'in:cash,card,transfer,other,credit'],

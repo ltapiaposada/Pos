@@ -27,14 +27,14 @@ foreach ($key in $required) {
     }
 }
 
-if ($envMap["DB_CONNECTION"] -ne "pgsql") {
-    Write-Error "Este script solo soporta PostgreSQL (DB_CONNECTION=pgsql). Actual: $($envMap["DB_CONNECTION"])"
+if ($envMap["DB_CONNECTION"] -ne "mysql") {
+    Write-Error "Este script solo soporta MySQL (DB_CONNECTION=mysql). Actual: $($envMap["DB_CONNECTION"])"
     exit 1
 }
 
-$pgDumpPath = Get-Command pg_dump -ErrorAction SilentlyContinue
-if (-not $pgDumpPath) {
-    Write-Error "No se encontro pg_dump en el PATH. Instala PostgreSQL client tools y vuelve a intentar."
+$mysqlDumpPath = Get-Command mysqldump -ErrorAction SilentlyContinue
+if (-not $mysqlDumpPath) {
+    Write-Error "No se encontro mysqldump en el PATH. Instala MySQL client tools y vuelve a intentar."
     exit 1
 }
 
@@ -46,26 +46,26 @@ $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $dbName = $envMap["DB_DATABASE"]
 $outputFile = Join-Path $OutputDir "$dbName-$timestamp.sql"
 
-$env:PGPASSWORD = $envMap["DB_PASSWORD"]
+$env:MYSQL_PWD = $envMap["DB_PASSWORD"]
 try {
-    & pg_dump `
+    & mysqldump `
         --host=$($envMap["DB_HOST"]) `
         --port=$($envMap["DB_PORT"]) `
-        --username=$($envMap["DB_USERNAME"]) `
-        --dbname=$dbName `
-        --format=plain `
-        --no-owner `
-        --no-privileges `
-        --encoding=UTF8 `
-        --file=$outputFile
+        --user=$($envMap["DB_USERNAME"]) `
+        --default-character-set=utf8mb4 `
+        --single-transaction `
+        --skip-lock-tables `
+        --routines `
+        --triggers `
+        $dbName | Out-File -FilePath $outputFile -Encoding utf8
 
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "pg_dump fallo con codigo $LASTEXITCODE"
+        Write-Error "mysqldump fallo con codigo $LASTEXITCODE"
         exit $LASTEXITCODE
     }
 }
 finally {
-    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+    Remove-Item Env:\MYSQL_PWD -ErrorAction SilentlyContinue
 }
 
 Write-Output "Backup creado: $outputFile"

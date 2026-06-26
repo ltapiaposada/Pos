@@ -17,8 +17,8 @@ class EnsureRestaurantCompany
             return redirect()->route('login');
         }
 
-        if (CompanyContext::activeSubscriptionPlanType($user->company) !== 'restaurant') {
-            abort(403, 'El modulo restaurante solo esta disponible para empresas tipo restaurante.');
+        if (! CompanyContext::isRestaurantService($user->company)) {
+            abort(403, 'El modulo restaurante solo esta disponible cuando el servicio activo es Restaurante.');
         }
 
         return $next($request);

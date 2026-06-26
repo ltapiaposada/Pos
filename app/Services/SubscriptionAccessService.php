@@ -26,7 +26,7 @@ class SubscriptionAccessService
             return [
                 'blocked' => true,
                 'warning' => false,
-                'message' => 'Tu suscripción ha vencido. Para continuar usando el sistema, renueva tu suscripción.',
+                'message' => 'Tu suscripcion ha vencido. Para continuar usando el sistema, renueva tu suscripcion.',
                 'subscription' => null,
                 'days_left' => null,
             ];
@@ -45,7 +45,7 @@ class SubscriptionAccessService
             return [
                 'blocked' => true,
                 'warning' => false,
-                'message' => 'Tu suscripción ha vencido. Para continuar usando el sistema, renueva tu suscripción.',
+                'message' => 'Tu suscripcion ha vencido. Para continuar usando el sistema, renueva tu suscripcion.',
                 'subscription' => $subscription,
                 'days_left' => $daysLeft,
             ];
@@ -55,7 +55,7 @@ class SubscriptionAccessService
             return [
                 'blocked' => true,
                 'warning' => false,
-                'message' => 'La suscripción actual no está pagada. Debes registrar el pago para habilitar el acceso al sistema.',
+                'message' => 'La suscripcion actual no esta pagada. Debes registrar el pago para habilitar el acceso al sistema.',
                 'subscription' => $subscription,
                 'days_left' => $daysLeft,
             ];
@@ -67,7 +67,7 @@ class SubscriptionAccessService
             'blocked' => false,
             'warning' => $warning,
             'message' => $warning
-                ? 'Tu suscripción vence pronto. Realiza el pago antes del vencimiento para continuar usando el sistema sin interrupciones.'
+                ? 'Tu suscripcion vence pronto. Realiza el pago antes del vencimiento para continuar usando el sistema sin interrupciones.'
                 : null,
             'subscription' => $subscription,
             'days_left' => $daysLeft,
@@ -104,14 +104,14 @@ class SubscriptionAccessService
     private function resolveSubscription(Company $company): ?CompanySubscription
     {
         $selectedPlan = request()?->session()?->get('active_subscription_plan_type');
+        $today = now()->startOfDay();
 
         if ($selectedPlan) {
             $selected = $company->subscriptions()
                 ->where('plan_type', $selectedPlan)
-                ->whereIn('status', [
-                    CompanySubscription::STATUS_ACTIVE,
-                    CompanySubscription::STATUS_PENDING_PAYMENT,
-                ])
+                ->where('status', CompanySubscription::STATUS_ACTIVE)
+                ->where('payment_status', CompanySubscription::PAYMENT_STATUS_PAID)
+                ->whereDate('end_date', '>=', $today)
                 ->orderByDesc('start_date')
                 ->orderByDesc('end_date')
                 ->orderByDesc('id')
@@ -124,6 +124,8 @@ class SubscriptionAccessService
 
         $effective = $company->subscriptions()
             ->where('status', CompanySubscription::STATUS_ACTIVE)
+            ->where('payment_status', CompanySubscription::PAYMENT_STATUS_PAID)
+            ->whereDate('end_date', '>=', $today)
             ->orderByDesc('start_date')
             ->orderByDesc('end_date')
             ->orderByDesc('id')
@@ -142,6 +144,23 @@ class SubscriptionAccessService
 
         if ($pending) {
             return $pending;
+        }
+
+        if ($selectedPlan) {
+            $selectedFallback = $company->subscriptions()
+                ->where('plan_type', $selectedPlan)
+                ->whereIn('status', [
+                    CompanySubscription::STATUS_ACTIVE,
+                    CompanySubscription::STATUS_PENDING_PAYMENT,
+                ])
+                ->orderByDesc('start_date')
+                ->orderByDesc('end_date')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($selectedFallback) {
+                return $selectedFallback;
+            }
         }
 
         return $company->subscriptions()

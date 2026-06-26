@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductModifierGroup;
 use App\Models\ProductModifierOption;
 use App\Models\RestaurantOrderItemSelection;
+use App\Support\UnitConverter;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -38,6 +39,13 @@ class ProductModifierSelectionService
                     $action = RestaurantOrderItemSelection::ACTION_REMOVE;
                 }
 
+                $inventoryUnit = $option->inventory_unit ?: $option->product?->unit;
+                $factor = UnitConverter::resolveFactor(
+                    $inventoryUnit,
+                    $option->product?->unit,
+                    (float) ($option->inventory_unit_factor ?? 1)
+                );
+
                 return [
                     'company_id' => $product->company_id,
                     'product_modifier_group_id' => $group->id,
@@ -48,9 +56,9 @@ class ProductModifierSelectionService
                     'selection_action' => $action,
                     'price_delta' => $action === RestaurantOrderItemSelection::ACTION_INCLUDE ? (float) $option->price_delta : 0,
                     'inventory_quantity' => (float) ($option->inventory_quantity ?? 0),
-                    'inventory_unit' => $option->inventory_unit ?: $option->product?->unit,
-                    'inventory_unit_factor' => (float) ($option->inventory_unit_factor ?? 1),
-                    'stock_quantity' => round((float) ($option->inventory_quantity ?? 0) * (float) ($option->inventory_unit_factor ?? 1), 6),
+                    'inventory_unit' => $inventoryUnit,
+                    'inventory_unit_factor' => $factor,
+                    'stock_quantity' => round((float) ($option->inventory_quantity ?? 0) * $factor, 6),
                 ];
             })
             ->values();

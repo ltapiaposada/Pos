@@ -39,7 +39,7 @@
                             <span class="text-sm font-semibold">${{ number_format($balance, 2) }}</span>
                         </div>
                         <div class="mt-2 space-y-1 text-sm">
-                            <p><span class="text-base-content/60">Cliente:</span> {{ $sale->customer?->name ?? 'Consumidor final' }}</p>
+                            <p><span class="text-base-content/60">Cliente:</span> {{ $sale->customer?->name ?? 'Cliente Mostrador' }}</p>
                             <p><span class="text-base-content/60">Sucursal:</span> {{ $sale->branch?->name }}</p>
                             <p><span class="text-base-content/60">Total:</span> ${{ number_format((float) $sale->total, 2) }}</p>
                             <p><span class="text-base-content/60">Pagado:</span> ${{ number_format((float) $sale->paid_total, 2) }}</p>
@@ -104,7 +104,7 @@
                             <tr>
                                 <td>#{{ $sale->sale_number }}</td>
                                 <td>{{ $sale->sold_at?->format('Y-m-d H:i') }}</td>
-                                <td>{{ $sale->customer?->name ?? 'Consumidor final' }}</td>
+                                <td>{{ $sale->customer?->name ?? 'Cliente Mostrador' }}</td>
                                 <td>{{ $sale->branch?->name }}</td>
                                 <td class="text-right">${{ number_format((float) $sale->total, 2) }}</td>
                                 <td class="text-right">${{ number_format((float) $sale->paid_total, 2) }}</td>

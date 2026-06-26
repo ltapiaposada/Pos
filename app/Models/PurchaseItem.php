@@ -46,4 +46,14 @@ class PurchaseItem extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function serials()
+    {
+        return $this->hasMany(InventorySerial::class);
+    }
+
+    public function lots()
+    {
+        return $this->hasMany(InventoryLot::class);
+    }
 }

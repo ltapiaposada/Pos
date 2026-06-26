@@ -31,7 +31,7 @@ class ResolveStorefrontCompany
             }
 
             return redirect()->to($request->fullUrl())
-                ->with('status', 'Tu sesión pertenecía a otra tienda y se cerró para continuar aquí.');
+                ->with('status', 'Tu sesion pertenecia a otra tienda y se cerro para continuar aqui.');
         }
 
         return $next($request);

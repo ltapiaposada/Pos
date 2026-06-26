@@ -20,9 +20,12 @@
             $logoUrl = $business['logo_url'] ?? null;
             $businessName = $business['name'] ?? config('app.name', 'Punto de venta');
             $user = Auth::user();
-            $companyTypeSlug = \App\Support\CompanyContext::activeSubscriptionPlanType($user?->company);
-            $isRestaurantCompany = $companyTypeSlug === 'restaurant';
-            $subscriptionModeLabel = $companyTypeSlug === 'restaurant' ? 'Restaurante' : ($companyTypeSlug === 'pos' ? 'POS' : ucfirst((string) $companyTypeSlug));
+            $activeService = \App\Support\CompanyContext::activeService($user?->company);
+            $isRestaurantService = $activeService === \App\Support\CompanyContext::SERVICE_RESTAURANT;
+            $isPosService = $activeService === \App\Support\CompanyContext::SERVICE_POS;
+            $isOpticService = $activeService === \App\Support\CompanyContext::SERVICE_OPTIC;
+            $supportsClassicPos = \App\Support\CompanyContext::supportsClassicPos($user?->company);
+            $subscriptionModeLabel = $isRestaurantService ? 'Restaurante' : ($isOpticService ? 'Optica' : ($isPosService ? 'POS' : ucfirst((string) $activeService)));
             $canSwitchSubscriptionContext = $user
                 ? app(\App\Services\SubscriptionAccessService::class)->hasMultiplePaidActivePlanContexts($user->company)
                 : false;
@@ -36,14 +39,25 @@
                 ->orderByRaw('(min_stock - stock) desc')
                 ->limit(10)
                 ->get();
-            $pendingEcommerceOrders = \App\Models\Sale::query()
-                ->where('order_source', \App\Models\Sale::SOURCE_ECOMMERCE)
-                ->whereNull('invoiced_at')
-                ->whereNotIn('status', [
-                    \App\Models\Sale::STATUS_SHIPPED,
-                    \App\Models\Sale::STATUS_CANCELLED,
-                ])
-                ->count();
+            $pendingEcommerceOrders = $isRestaurantService
+                ? \App\Models\RestaurantOrder::query()
+                    ->where(function ($query) {
+                        $query->where('notes', 'like', 'Origen: Pedido web restaurante%')
+                            ->orWhereIn('order_type', [
+                                \App\Models\RestaurantOrder::TYPE_DELIVERY,
+                                \App\Models\RestaurantOrder::TYPE_TAKEAWAY,
+                            ]);
+                    })
+                    ->whereNull('sale_id')
+                    ->count()
+                : \App\Models\Sale::query()
+                    ->where('order_source', \App\Models\Sale::SOURCE_ECOMMERCE)
+                    ->whereNull('invoiced_at')
+                    ->whereNotIn('status', [
+                        \App\Models\Sale::STATUS_SHIPPED,
+                        \App\Models\Sale::STATUS_CANCELLED,
+                    ])
+                    ->count();
         @endphp
 
         <div id="route-loader" class="route-loader" aria-hidden="true">
@@ -166,6 +180,7 @@
                                 $securityMenuOpen = request()->is('security/users*') || request()->is('security/roles*') || request()->is('settings*') || request()->routeIs('admin.implementation-progress') || request()->routeIs('system.companies.*');
                                 $accountingMenuOpen = request()->is('accounting/accounts*') || request()->is('accounting/expenses*') || request()->is('accounting/receivables*') || request()->is('accounting/payables*') || request()->is('accounting/opening-balances*') || request()->is('accounting/entries*') || request()->is('accounting/income-statement*') || request()->is('accounting/close-period*');
                                 $ecommerceMenuOpen = request()->is('ecommerce/orders*');
+                                $optometryMenuOpen = request()->routeIs('optometry.*');
                             @endphp
 
                             <li class="nav-header">INICIO</li>
@@ -182,17 +197,17 @@
                                     <a href="#" class="nav-link {{ $salesMenuOpen ? 'active' : '' }}">
                                         <i class="nav-icon fa-solid fa-cart-shopping"></i>
                                         <p>
-                                            {{ $isRestaurantCompany ? 'Restaurante y caja' : 'Ventas y caja' }}
+                                            {{ $isRestaurantService ? 'Restaurante y caja' : 'Ventas y caja' }}
                                             <i class="nav-arrow fa-solid fa-angle-right right"></i>
                                         </p>
                                     </a>
                                     <ul class="nav nav-treeview">
                                         @can('create_sale')
-                                            @if (! $isRestaurantCompany)
+                                            @if ($supportsClassicPos)
                                             <li class="nav-item">
                                                 <a href="{{ route('pos.index') }}" class="nav-link {{ request()->routeIs('pos.*') ? 'active' : '' }}">
                                                     <i class="nav-icon fa-regular fa-circle"></i>
-                                                    <p>Punto de venta</p>
+                                                    <p>{{ $isOpticService ? 'Ventas optica' : 'Punto de venta' }}</p>
                                                 </a>
                                             </li>
                                             @endif
@@ -203,7 +218,7 @@
                                                 </a>
                                             </li>
                                         @endcan
-                                        @if ($isRestaurantCompany)
+                                        @if ($isRestaurantService)
                                         @can('manage_restaurant')
                                             <li class="nav-item">
                                                 <a href="{{ route('restaurant.index') }}" class="nav-link {{ request()->routeIs('restaurant.index') || request()->routeIs('restaurant.orders.*') ? 'active' : '' }}">
@@ -254,6 +269,47 @@
                                     </ul>
                                 </li>
                             @endcanany
+
+                            @if ($isOpticService)
+                                @canany(['manage_optometry_patients', 'manage_optometry_records', 'manage_optometry_orders'])
+                                    <li class="nav-header">OPTOMETRIA</li>
+                                    <li class="nav-item has-treeview {{ $optometryMenuOpen ? 'menu-open' : '' }}">
+                                        <a href="#" class="nav-link {{ $optometryMenuOpen ? 'active' : '' }}">
+                                            <i class="nav-icon fa-solid fa-eye"></i>
+                                            <p>
+                                                Optometria
+                                                <i class="nav-arrow fa-solid fa-angle-right right"></i>
+                                            </p>
+                                        </a>
+                                        <ul class="nav nav-treeview">
+                                            @can('manage_optometry_patients')
+                                                <li class="nav-item">
+                                                    <a href="{{ route('optometry.patients.index') }}" class="nav-link {{ request()->routeIs('optometry.patients.*') ? 'active' : '' }}">
+                                                        <i class="nav-icon fa-regular fa-circle"></i>
+                                                        <p>Pacientes</p>
+                                                    </a>
+                                                </li>
+                                            @endcan
+                                            @can('manage_optometry_records')
+                                                <li class="nav-item">
+                                                    <a href="{{ route('optometry.records.index') }}" class="nav-link {{ request()->routeIs('optometry.records.*') ? 'active' : '' }}">
+                                                        <i class="nav-icon fa-regular fa-circle"></i>
+                                                        <p>Historias clinicas</p>
+                                                    </a>
+                                                </li>
+                                            @endcan
+                                            @can('manage_optometry_orders')
+                                                <li class="nav-item">
+                                                    <a href="{{ route('optometry.orders.index') }}" class="nav-link {{ request()->routeIs('optometry.orders.*') ? 'active' : '' }}">
+                                                        <i class="nav-icon fa-regular fa-circle"></i>
+                                                        <p>Ordenes medicas</p>
+                                                    </a>
+                                                </li>
+                                            @endcan
+                                        </ul>
+                                    </li>
+                                @endcanany
+                            @endif
 
                             @can('manage_ecommerce_orders')
                                 <li class="nav-header">E-COMMERCE</li>

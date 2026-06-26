@@ -18,6 +18,7 @@ class SaleItem extends Model
         'product_name',
         'sku',
         'barcode',
+        'delivery_instructions',
         'quantity',
         'unit_price',
         'discount_type',
@@ -49,5 +50,15 @@ class SaleItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function serials()
+    {
+        return $this->hasMany(InventorySerial::class);
+    }
+
+    public function lots()
+    {
+        return $this->hasMany(SaleItemLot::class);
     }
 }

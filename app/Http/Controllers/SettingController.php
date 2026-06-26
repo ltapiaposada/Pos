@@ -19,10 +19,12 @@ class SettingController extends Controller
         );
 
         $taxes = Tax::query()->where('is_active', true)->orderBy('name')->get();
+        $business = is_array($setting->value) ? $setting->value : [];
 
         return view('settings.edit', [
-            'business' => $setting->value ?? [],
+            'business' => $business,
             'taxes' => $taxes,
+            'ecommerceCouponsText' => $this->formatCouponsForTextarea($business['ecommerce_coupons'] ?? []),
         ]);
     }
 
@@ -60,8 +62,9 @@ class SettingController extends Controller
             'qr_size' => $request->file('payment_qr')?->getSize(),
         ]);
 
-        $payload = $request->safe()->except(['logo', 'payment_qr']);
+        $payload = $request->safe()->except(['logo', 'payment_qr', 'ecommerce_coupons_text']);
         $payload['allow_negative_stock'] = (bool) ($payload['allow_negative_stock'] ?? false);
+        $payload['ecommerce_flat_shipping'] = round((float) ($payload['ecommerce_flat_shipping'] ?? 0), 2);
         $currentBusiness = is_array($setting->value) ? $setting->value : [];
 
         if ($request->hasFile('logo')) {
@@ -164,5 +167,13 @@ class SettingController extends Controller
                 'message' => config('app.debug') ? $e->getMessage() : $fallbackMessage,
             ], 422);
         }
+    }
+
+    private function formatCouponsForTextarea(array $coupons): string
+    {
+        return collect($coupons)
+            ->filter(fn ($percent, $code) => trim((string) $code) !== '' && is_numeric($percent))
+            ->map(fn ($percent, $code) => strtoupper((string) $code).'='.(float) $percent)
+            ->implode(PHP_EOL);
     }
 }

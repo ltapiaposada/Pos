@@ -70,6 +70,7 @@ class RestaurantOrderController extends Controller
             'sale_price',
             'tax_id',
             'product_type',
+            'uses_component_groups',
         ]);
 
         $availableByProduct = app(InventoryService::class)->availableStockForProducts($products, $branchId);
@@ -84,6 +85,7 @@ class RestaurantOrderController extends Controller
             'sale_price' => (float) $product->sale_price,
             'tax_rate' => (float) ($product->tax?->rate ?? 0),
             'available_stock' => (float) ($availableByProduct[$product->id] ?? 0),
+            'uses_component_groups' => (bool) $product->uses_component_groups,
             'modifier_groups' => $product->modifierGroups
                 ->filter(fn ($group) => $group->options->where('is_active', true)->isNotEmpty())
                 ->map(fn ($group) => [

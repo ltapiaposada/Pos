@@ -33,7 +33,14 @@ export default defineConfig(({ mode }) => {
         },
         plugins: [
             laravel({
-                input: ['resources/css/vendor.css', 'resources/css/app.css', 'resources/js/app.js'],
+                input: [
+                    'resources/css/vendor.css',
+                    'resources/css/app.css',
+                    'resources/js/app.js',
+                    'resources/js/pos-barcode-scanner.js',
+                    'resources/js/product-barcode-scanner.js',
+                    'resources/js/remote-scanner.js',
+                ],
                 refresh: true,
             }),
         ],

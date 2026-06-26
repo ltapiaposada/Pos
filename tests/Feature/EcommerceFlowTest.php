@@ -285,7 +285,7 @@ class EcommerceFlowTest extends TestCase
             ->post('/checkout', [
                 'address' => 'Calle 123',
                 'phone' => '5551234',
-                'payment_method' => 'card',
+                'payment_method' => 'transfer',
                 'payment_reference' => 'TRX-ECOM-001',
                 'customer_note' => 'Dejar en recepcion',
             ]);
@@ -299,11 +299,12 @@ class EcommerceFlowTest extends TestCase
         $this->assertSame(1, $sale->items()->count());
         $this->assertSame('pending', $sale->status);
         $this->assertSame('ecommerce', $sale->order_source);
+        $this->assertSame(0.0, (float) $sale->paid_total);
         $this->assertStringContainsString('Dejar en recepcion', (string) $sale->customer_note);
         $this->assertStringContainsString('Referencia de pago: TRX-ECOM-001', (string) $sale->customer_note);
         $this->assertDatabaseHas('payments', [
             'sale_id' => $sale->id,
-            'method' => 'card',
+            'method' => 'transfer',
             'reference' => 'TRX-ECOM-001',
         ]);
         $this->assertSame(8.0, (float) Inventory::query()->where('product_id', $product->id)->value('stock'));
@@ -554,7 +555,7 @@ class EcommerceFlowTest extends TestCase
                 'address' => 'Calle 123',
                 'phone' => '5551234',
                 'fulfillment_type' => 'delivery',
-                'payment_method' => 'card',
+                'payment_method' => 'contraentrega',
                 'payment_reference' => 'TRX-REST-001',
                 'customer_note' => 'Sin demoras',
             ]);

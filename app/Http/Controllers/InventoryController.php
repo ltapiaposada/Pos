@@ -34,7 +34,11 @@ class InventoryController extends Controller
         $stockByProduct = Inventory::query()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->pluck('stock', 'product_id');
-        $products = Product::query()->orderBy('name')->get()->map(function (Product $product) use ($stockByProduct) {
+        $products = Product::query()
+            ->whereIn('product_type', [Product::TYPE_SIMPLE, Product::TYPE_VARIANT])
+            ->orderBy('name')
+            ->get()
+            ->map(function (Product $product) use ($stockByProduct) {
             $product->current_stock = (float) ($stockByProduct[$product->id] ?? 0);
 
             return $product;

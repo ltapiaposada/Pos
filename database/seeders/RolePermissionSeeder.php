@@ -34,6 +34,9 @@ class RolePermissionSeeder extends Seeder
             'manage_ecommerce_orders',
             'manage_restaurant',
             'manage_restaurant_kitchen',
+            'manage_optometry_patients',
+            'manage_optometry_records',
+            'manage_optometry_orders',
         ];
 
         foreach ($permissions as $permission) {
@@ -67,6 +70,9 @@ class RolePermissionSeeder extends Seeder
             'manage_ecommerce_orders',
             'manage_restaurant',
             'manage_restaurant_kitchen',
+            'manage_optometry_patients',
+            'manage_optometry_records',
+            'manage_optometry_orders',
         ]);
         $cashier->syncPermissions([
             'open_cash_register',
@@ -76,6 +82,7 @@ class RolePermissionSeeder extends Seeder
             'apply_discount',
             'manage_restaurant',
             'manage_restaurant_kitchen',
+            'manage_optometry_orders',
         ]);
         $customer->syncPermissions([]);
         $systemOwner->syncPermissions($permissions);

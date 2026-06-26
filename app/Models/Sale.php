@@ -27,6 +27,7 @@ class Sale extends Model
         'branch_id',
         'user_id',
         'customer_id',
+        'medical_order_id',
         'cash_register_session_id',
         'sale_number',
         'status',
@@ -87,6 +88,11 @@ class Sale extends Model
     public function items()
     {
         return $this->hasMany(SaleItem::class);
+    }
+
+    public function medicalOrder()
+    {
+        return $this->belongsTo(MedicalOrder::class);
     }
 
     public function payments()

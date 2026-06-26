@@ -1,0 +1,32 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="stacked-gradient" x1="340" y1="170" x2="760" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="0.48" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="stacked-ring" x1="250" y1="250" x2="850" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7DD3FC"/>
+      <stop offset="0.5" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <filter id="stacked-glow" x="120" y="110" width="920" height="620" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="1200" rx="48" fill="#F8FAFC"/>
+
+  <g transform="translate(0 10)">
+    <text x="362" y="540" fill="url(#stacked-gradient)" font-size="430" font-weight="800" font-family="Segoe UI, Montserrat, Arial, sans-serif" letter-spacing="-10">S</text>
+    <ellipse cx="590" cy="360" rx="280" ry="100" transform="rotate(-12 590 360)" stroke="url(#stacked-ring)" stroke-width="28" filter="url(#stacked-glow)"/>
+    <ellipse cx="590" cy="360" rx="280" ry="100" transform="rotate(-12 590 360)" stroke="#E0F2FE" stroke-width="8" stroke-dasharray="32 20"/>
+  </g>
+
+  <text x="600" y="770" text-anchor="middle" fill="#0F172A" font-size="122" font-weight="760" font-family="Segoe UI, Montserrat, Arial, sans-serif" letter-spacing="14">SATURNEXT</text>
+  <text x="600" y="850" text-anchor="middle" fill="#475569" font-size="34" font-weight="600" font-family="Segoe UI, Montserrat, Arial, sans-serif" letter-spacing="12">SOFTWARE SOLUTIONS</text>
+</svg>

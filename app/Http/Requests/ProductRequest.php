@@ -6,12 +6,20 @@ use App\Models\Product;
 use App\Models\ProductModifierOption;
 use App\Support\CompanyRules;
 use App\Support\CompanyContext;
+use App\Support\UnitConverter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class ProductRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('uses_component_groups')) {
+            $this->merge(['uses_component_groups' => false]);
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user()->can('manage_products');
@@ -31,8 +39,10 @@ class ProductRequest extends FormRequest
             'image_url' => ['nullable', 'string', 'max:255'],
             'image_file' => ['nullable', 'image', 'max:5120'],
             'description' => ['nullable', 'string', 'max:255'],
-            'unit' => ['required', 'string', 'max:32'],
-            'product_type' => ['required', Rule::in([Product::TYPE_SIMPLE, Product::TYPE_KIT, Product::TYPE_VARIANT])],
+            'delivery_instructions' => ['nullable', 'string', 'max:5000'],
+            'unit' => ['required', Rule::in(array_keys(Product::unitOptions()))],
+            'product_type' => ['required', Rule::in(Product::TYPES)],
+            'uses_component_groups' => ['required', 'boolean'],
             'parent_product_id' => ['nullable', 'integer', CompanyRules::companyScoped('products')],
             'cost_price' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['required', 'numeric', 'min:0'],
@@ -41,7 +51,7 @@ class ProductRequest extends FormRequest
             'kit_items' => ['nullable', 'array'],
             'kit_items.*.component_product_id' => ['required_with:kit_items.*.quantity', 'integer', CompanyRules::companyScoped('products')],
             'kit_items.*.quantity' => ['required_with:kit_items.*.component_product_id', 'numeric', 'gt:0'],
-            'kit_items.*.component_unit' => ['nullable', 'string', 'max:32'],
+            'kit_items.*.component_unit' => ['nullable', Rule::in(array_keys(Product::unitOptions()))],
             'kit_items.*.component_unit_factor' => ['nullable', 'numeric', 'gt:0'],
             'modifier_groups' => ['nullable', 'array'],
             'modifier_groups.*.name' => ['required_with:modifier_groups.*.selection_type', 'string', 'max:255'],
@@ -54,7 +64,7 @@ class ProductRequest extends FormRequest
             'modifier_groups.*.options.*.label' => ['required_with:modifier_groups.*.options.*.product_id', 'nullable', 'string', 'max:255'],
             'modifier_groups.*.options.*.price_delta' => ['nullable', 'numeric', 'min:0'],
             'modifier_groups.*.options.*.inventory_quantity' => ['nullable', 'numeric', 'gt:0'],
-            'modifier_groups.*.options.*.inventory_unit' => ['nullable', 'string', 'max:32'],
+            'modifier_groups.*.options.*.inventory_unit' => ['nullable', Rule::in(array_keys(Product::unitOptions()))],
             'modifier_groups.*.options.*.inventory_unit_factor' => ['nullable', 'numeric', 'gt:0'],
             'modifier_groups.*.options.*.is_default' => ['nullable', 'boolean'],
             'modifier_groups.*.options.*.is_active' => ['nullable', 'boolean'],
@@ -65,6 +75,7 @@ class ProductRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             $type = $this->input('product_type');
+            $usesComponentGroups = $this->boolean('uses_component_groups');
             $productId = $this->route('product')?->id;
             $parentProductId = $this->input('parent_product_id');
             $legacyModifierOptionIds = ProductModifierOption::query()
@@ -99,7 +110,11 @@ class ProductRequest extends FormRequest
                 $validator->errors()->add('parent_product_id', 'Solo las variantes pueden tener producto base.');
             }
 
-                if ($type === Product::TYPE_KIT) {
+            if ($type !== Product::TYPE_KIT && $usesComponentGroups) {
+                $validator->errors()->add('uses_component_groups', 'Solo los productos tipo kit pueden manejar grupos de componentes.');
+            }
+
+            if ($type === Product::TYPE_KIT && ! $usesComponentGroups) {
                 if ($kitItems->isEmpty()) {
                     $validator->errors()->add('kit_items', 'Debes agregar al menos un componente al kit.');
                 }
@@ -114,14 +129,26 @@ class ProductRequest extends FormRequest
                 }
 
                 $kitItems->each(function (array $item, int $index) use ($validator): void {
-                    if (empty($item['component_unit_factor']) || (float) $item['component_unit_factor'] <= 0) {
+                    $stockUnit = Product::query()
+                        ->whereKey($item['component_product_id'] ?? null)
+                        ->value('unit');
+                    $hasAutomaticConversion = UnitConverter::factor($item['component_unit'] ?? $stockUnit, $stockUnit) !== null;
+
+                    if (! $hasAutomaticConversion && (empty($item['component_unit_factor']) || (float) $item['component_unit_factor'] <= 0)) {
                         $validator->errors()->add("kit_items.{$index}.component_unit_factor", 'Debes indicar el factor de conversion hacia la unidad de stock.');
                     }
                 });
             }
 
-            collect($this->input('modifier_groups', []))
+            $modifierGroups = collect($this->input('modifier_groups', []))
                 ->filter(fn ($group) => ! empty($group['name']))
+                ->values();
+
+            if ($type === Product::TYPE_KIT && $usesComponentGroups && $modifierGroups->isEmpty()) {
+                $validator->errors()->add('modifier_groups', 'Debes agregar al menos un grupo de componentes al kit.');
+            }
+
+            $modifierGroups
                 ->each(function (array $group, int $groupIndex) use ($validator, $productId, $legacyModifierOptionIds): void {
                     $type = $group['selection_type'] ?? null;
                     $minSelect = (int) ($group['min_select'] ?? 0);
@@ -185,7 +212,12 @@ class ProductRequest extends FormRequest
                                 );
                             }
 
-                            if (empty($option['inventory_unit_factor']) || (float) $option['inventory_unit_factor'] <= 0) {
+                            $stockUnit = Product::query()
+                                ->whereKey($option['product_id'] ?? null)
+                                ->value('unit');
+                            $hasAutomaticConversion = UnitConverter::factor($option['inventory_unit'] ?? $stockUnit, $stockUnit) !== null;
+
+                            if (! $hasAutomaticConversion && (empty($option['inventory_unit_factor']) || (float) $option['inventory_unit_factor'] <= 0)) {
                                 $validator->errors()->add(
                                     "modifier_groups.{$groupIndex}.options.{$optionIndex}.inventory_unit_factor",
                                     'Debes indicar el factor de conversion hacia la unidad de stock.'

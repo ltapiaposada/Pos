@@ -24,7 +24,7 @@ class EcommerceCheckoutRequest extends FormRequest
                 'string',
                 'max:255',
             ],
-            'payment_method' => ['required', 'in:card,transfer,qr,contraentrega,other'],
+            'payment_method' => ['required', 'in:transfer,qr,contraentrega'],
             'payment_reference' => ['nullable', 'required_if:payment_method,transfer,qr', 'string', 'max:100'],
             'coupon_code' => ['nullable', 'string', 'max:50'],
             'customer_note' => ['nullable', 'string', 'max:255'],

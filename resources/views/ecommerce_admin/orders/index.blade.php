@@ -4,8 +4,8 @@
     <div class="page-header">
         <div class="page-header-row">
             <div>
-                <h1 class="page-title">Pedidos e-commerce</h1>
-                <p class="page-subtitle">Gestion de pedidos de la tienda en linea</p>
+                <h1 class="page-title">{{ $isRestaurantService ? 'Pedidos web restaurante' : 'Pedidos e-commerce' }}</h1>
+                <p class="page-subtitle">{{ $isRestaurantService ? 'Gestion del flujo web del restaurante' : 'Gestion de pedidos de la tienda en linea' }}</p>
             </div>
         </div>
     </div>
@@ -15,7 +15,13 @@
             <form class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="sm:col-span-2">
                     <label class="field-label">Buscar</label>
-                    <input type="text" name="q" value="{{ request('q') }}" class="input input-bordered w-full" placeholder="Pedido, cliente o direccion">
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ request('q') }}"
+                        class="input input-bordered w-full"
+                        placeholder="{{ $isRestaurantService ? 'Pedido, cliente o nota' : 'Pedido, cliente o direccion' }}"
+                    >
                 </div>
                 <div>
                     <label class="field-label">Estado</label>
@@ -35,8 +41,8 @@
             @php
                 $paymentLabels = [
                     'card' => 'Tarjeta',
-                    'transfer' => 'Transferencia',
-                    'qr' => 'Pago QR',
+                    'transfer' => 'Transferencia por validar',
+                    'qr' => 'QR por validar',
                     'contraentrega' => 'Contraentrega',
                     'other' => 'Otro',
                     'cash' => 'Efectivo',
@@ -44,11 +50,11 @@
                 ];
             @endphp
 
-            @if ($restaurantOrders->isNotEmpty())
+            @if ($isRestaurantService && $restaurantOrders->isNotEmpty())
                 <div class="mt-6">
                     <div class="mb-3">
-                        <h2 class="text-sm font-semibold">Pedidos web restaurante en trámite</h2>
-                        <p class="text-xs text-base-content/60 mt-1">Estos pedidos ya entraron al flujo de restaurante y todavía no se han convertido en venta.</p>
+                        <h2 class="text-sm font-semibold">Pedidos web restaurante en tramite</h2>
+                        <p class="text-xs text-base-content/60 mt-1">Estos pedidos ya entraron al flujo de restaurante y todavia no se han convertido en venta.</p>
                     </div>
 
                     <div class="space-y-3 md:hidden">
@@ -124,8 +130,10 @@
 
             <div class="mt-6">
                 <div class="mb-3">
-                    <h2 class="text-sm font-semibold">Ventas e-commerce registradas</h2>
-                    <p class="text-xs text-base-content/60 mt-1">Aquí aparecen los pedidos web clásicos o los que ya fueron convertidos a factura/venta.</p>
+                    <h2 class="text-sm font-semibold">{{ $isRestaurantService ? 'Ventas web del restaurante' : 'Ventas e-commerce registradas' }}</h2>
+                    <p class="text-xs text-base-content/60 mt-1">
+                        {{ $isRestaurantService ? 'Aqui aparecen los pedidos web del restaurante que ya fueron convertidos a venta o factura.' : 'Aqui aparecen los pedidos web de la tienda y su avance desde recepcion hasta entrega.' }}
+                    </p>
                 </div>
             </div>
 
@@ -143,6 +151,9 @@
                             <p><span class="text-base-content/60">Cliente:</span> {{ $order->customer?->name ?? 'Sin cliente' }}</p>
                             <p><span class="text-base-content/60">Pago:</span> {{ $paymentLabels[$order->payments->first()?->method ?? ''] ?? 'Sin registrar' }}</p>
                         </div>
+                        @if ($order->status === \App\Models\Sale::STATUS_PENDING)
+                            <p class="mt-2 text-xs text-base-content/60">Primero valida el pago o la contraentrega antes de confirmar o facturar.</p>
+                        @endif
                         <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
                             <div class="rounded-xl border border-base-300 bg-base-100 px-3 py-2">
                                 <p class="text-xs text-base-content/60">Factura</p>
@@ -162,8 +173,8 @@
                             @if (! $order->invoiced_at || ! $order->accounted_at)
                                 <form method="POST" action="{{ route('ecommerce-admin.orders.invoice', $order) }}">
                                     @csrf
-                                    <button type="submit" class="btn btn-primary btn-sm w-full" onclick="return confirm('Facturar y contabilizar este pedido?')">
-                                        {{ ! $order->invoiced_at ? 'Convertir a factura' : 'Contabilizar factura' }}
+                                    <button type="submit" class="btn btn-primary btn-sm w-full" onclick="return confirm('Registrar venta o factura de este pedido?')">
+                                        {{ ! $order->invoiced_at ? 'Registrar venta / factura' : 'Contabilizar factura' }}
                                     </button>
                                 </form>
                             @endif
@@ -171,7 +182,7 @@
                     </article>
                 @empty
                     <div class="rounded-2xl border border-base-300 bg-base-100 p-5 text-center text-sm text-base-content/60">
-                        No hay pedidos registrados.
+                        No hay pedidos registrados para este servicio.
                     </div>
                 @endforelse
             </div>
@@ -212,8 +223,8 @@
                                         @if (! $order->invoiced_at || ! $order->accounted_at)
                                             <form method="POST" action="{{ route('ecommerce-admin.orders.invoice', $order) }}">
                                                 @csrf
-                                                <button type="submit" class="btn btn-primary btn-xs" onclick="return confirm('Facturar y contabilizar este pedido?')">
-                                                    {{ ! $order->invoiced_at ? 'Convertir a factura' : 'Contabilizar factura' }}
+                                                <button type="submit" class="btn btn-primary btn-xs" onclick="return confirm('Registrar venta o factura de este pedido?')">
+                                                    {{ ! $order->invoiced_at ? 'Registrar venta / factura' : 'Contabilizar factura' }}
                                                 </button>
                                             </form>
                                         @endif
@@ -222,7 +233,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-base-content/60">No hay pedidos registrados.</td>
+                                <td colspan="8" class="text-center text-base-content/60">No hay pedidos registrados para este servicio.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -234,5 +245,4 @@
             </div>
         </div>
     </div>
-
 @endsection

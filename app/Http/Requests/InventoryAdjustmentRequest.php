@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Inventory;
+use App\Models\Product;
 use App\Support\CompanyRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -30,6 +31,14 @@ class InventoryAdjustmentRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            $product = Product::query()->find($this->integer('product_id'));
+            if ($product && (! $product->tracksInventory() || $product->tracksSerials() || $product->tracksLots() || $product->product_type === Product::TYPE_KIT)) {
+                $validator->errors()->add(
+                    'product_id',
+                    'Este tipo de producto se controla desde compras o por sus componentes y no admite ajustes generales.'
+                );
+            }
+
             if ($this->input('type') !== 'OUT') {
                 return;
             }

@@ -205,7 +205,10 @@
                                     <div class="restaurant-order-product-card__body">
                                         <p class="restaurant-order-product-card__title" x-text="product.name"></p>
                                         <p class="restaurant-order-product-card__meta" x-text="product.sku || product.barcode || 'Sin codigo'"></p>
-                                        <p class="restaurant-order-product-card__meta">Disponible: <span x-text="toAmount(product.available_stock).toFixed(3)"></span></p>
+                                        <p class="restaurant-order-product-card__meta">
+                                            <span x-show="!product.uses_component_groups">Disponible: <span x-text="toAmount(product.available_stock).toFixed(3)"></span></span>
+                                            <span x-show="product.uses_component_groups">Componentes configurables</span>
+                                        </p>
                                         <p class="restaurant-order-product-card__price">$<span x-text="toAmount(product.sale_price).toFixed(2)"></span></p>
                                         <p x-show="(product.modifier_groups || []).length > 0" class="restaurant-order-product-card__hint">Configurable por componentes</p>
                                     </div>
@@ -656,6 +659,10 @@
                     return Math.max(0, nonCredit - this.total);
                 },
                 submitCheckout() {
+                    if (!window.confirm('¿Deseas convertir este pedido en una venta? Esta acción cerrará el pedido.')) {
+                        return;
+                    }
+
                     const payments = JSON.parse(this.paymentsPayload);
                     if (this.hasCartStockOverflow()) {
                         alert('Hay productos con cantidad superior al stock disponible.');

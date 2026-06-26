@@ -56,7 +56,18 @@
                 <tbody>
                     @foreach ($sale->items as $item)
                         <tr>
-                            <td>{{ $item->product_name }}</td>
+                            <td>
+                                {{ $item->product_name }}
+                                @if ($item->serials->isNotEmpty())
+                                    <br><small>Seriales: {{ $item->serials->pluck('serial_number')->join(', ') }}</small>
+                                @endif
+                                @if ($item->lots->isNotEmpty())
+                                    <br><small>Lotes: {{ $item->lots->map(fn ($allocation) => $allocation->lot?->lot_number)->filter()->join(', ') }}</small>
+                                @endif
+                                @if ($item->delivery_instructions)
+                                    <br><small>{!! nl2br(e($item->delivery_instructions)) !!}</small>
+                                @endif
+                            </td>
                             <td>{{ number_format($item->quantity, 2) }}</td>
                             <td>${{ number_format($item->line_total, 2) }}</td>
                         </tr>
@@ -86,6 +97,11 @@
             <div class="center">
                 Gracias por su compra
             </div>
+            @if ($sale->medicalOrder)
+                <div class="center" style="margin-top: 8px;">
+                    Orden medica #{{ $sale->medicalOrder->id }}
+                </div>
+            @endif
             <div class="center no-print" style="margin-top: 10px;">
                 <button class="print-btn" onclick="window.print()">Imprimir</button>
             </div>

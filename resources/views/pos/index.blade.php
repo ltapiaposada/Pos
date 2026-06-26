@@ -5,6 +5,7 @@
         $initialPosState = $oldPosState ?? [
             'branch_id' => null,
             'customer_id' => null,
+            'medical_order_id' => null,
             'global_discount' => 0,
             'items' => [],
             'payments' => [],
@@ -84,7 +85,7 @@
                             x-model="search"
                             @keydown.ctrl.k.prevent="focusSearch"
                             @input.debounce.300ms="fetchProducts"
-                            placeholder="Buscar producto (Ctrl+K)"
+                            placeholder="Nombre, codigo de barras o codigo del producto (Ctrl+K)"
                             class="input input-bordered h-10 w-full min-w-0 flex-1"
                         >
                         <button @click="fetchProducts" type="button" class="btn btn-outline h-10 px-5 sm:w-auto">
@@ -144,7 +145,10 @@
                                 <div class="card-body p-4 text-left">
                                     <div class="text-sm font-semibold" x-text="product.name"></div>
                                     <div class="text-xs text-base-content/60" x-text="product.sku"></div>
-                                    <div class="mt-1 text-[11px] text-base-content/60">Disponible: <span x-text="toAmount(product.available_stock).toFixed(3)"></span></div>
+                                    <div class="mt-1 text-[11px] text-base-content/60">
+                                        <span x-show="!product.uses_component_groups">Disponible: <span x-text="toAmount(product.available_stock).toFixed(3)"></span></span>
+                                        <span x-show="product.uses_component_groups">Componentes configurables</span>
+                                    </div>
                                     <div class="mt-2 text-sm font-semibold text-primary">$<span x-text="product.sale_price"></span></div>
                                 </div>
                             </button>
@@ -184,7 +188,7 @@
                             <div class="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                                 <div>
                                     <label class="text-base-content/60">Cantidad</label>
-                                    <input type="number" step="0.001" min="0.001" x-model.number="item.quantity" @input="sanitizeItemQuantity(item)" class="input input-bordered input-sm sm:input-xs w-full">
+                                    <input type="number" :step="item.product_type === 'serialized' ? 1 : 0.001" :min="item.product_type === 'serialized' ? 1 : 0.001" x-model.number="item.quantity" @input="sanitizeItemQuantity(item)" class="input input-bordered input-sm sm:input-xs w-full">
                                 </div>
                                 <div>
                                     <label class="text-base-content/60">Precio</label>
@@ -196,7 +200,39 @@
                                 </div>
                             </div>
                             <div class="mt-2 text-[11px] text-base-content/60">
-                                Disponible: <span x-text="toAmount(item.available_stock).toFixed(3)"></span>
+                                <span x-show="!item.uses_component_groups">Disponible: <span x-text="toAmount(item.available_stock).toFixed(3)"></span></span>
+                                <span x-show="item.uses_component_groups">El inventario se valida según los componentes elegidos.</span>
+                            </div>
+                            <div x-show="item.uses_component_groups" class="mt-3 space-y-3">
+                                <template x-for="group in item.modifier_groups || []" :key="group.id">
+                                    <div class="rounded-xl border border-base-200 p-3">
+                                        <label class="field-label" x-text="group.name"></label>
+                                        <select
+                                            x-show="group.selection_type === 'single'"
+                                            class="select select-bordered select-sm w-full"
+                                            :value="selectedOptionForGroup(item, group.id)"
+                                            @change="selectSingleGroupOption(item, group, $event.target.value)"
+                                        >
+                                            <option value="">Selecciona una opción</option>
+                                            <template x-for="option in group.options" :key="option.id">
+                                                <option :value="String(option.id)" x-text="option.price_delta > 0 ? `${option.label} (+$${Number(option.price_delta).toFixed(2)})` : option.label"></option>
+                                            </template>
+                                        </select>
+                                        <div x-show="group.selection_type !== 'single'" class="space-y-2">
+                                            <template x-for="option in group.options" :key="option.id">
+                                                <label class="flex items-center gap-2 text-sm">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="checkbox checkbox-sm"
+                                                        :checked="isModifierSelected(item, group.id, option.id)"
+                                                        @change="toggleModifierOption(item, group, option, $event.target.checked)"
+                                                    >
+                                                    <span x-text="option.label"></span>
+                                                </label>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </template>
@@ -229,11 +265,27 @@
                 @csrf
                 <input type="hidden" name="branch_id" :value="branchId">
                 <input type="hidden" name="customer_id" :value="customerId">
+                @if ($supportsMedicalOrders)
+                    <input type="hidden" name="medical_order_id" :value="medicalOrderId">
+                @endif
                 <input type="hidden" name="global_discount" :value="globalDiscount">
                 <input type="hidden" name="items" :value="itemsPayload">
                 <input type="hidden" name="payments" :value="paymentsPayload">
 
                 <div class="panel-body">
+                    @if ($supportsMedicalOrders)
+                    <div class="mb-4">
+                        <label class="field-label">Orden medica</label>
+                        <select x-model="medicalOrderId" class="select select-bordered w-full">
+                            <option value="">Sin orden medica</option>
+                            <template x-for="order in availableMedicalOrders" :key="order.id">
+                                <option :value="String(order.id)" x-text="`#${order.id} · ${order.patient_name} · ${order.ordered_at}`"></option>
+                            </template>
+                        </select>
+                        <p class="mt-1 text-xs text-base-content/60">Solo aparecen ordenes activas del paciente seleccionado.</p>
+                    </div>
+                    @endif
+
                     <h2 class="text-sm font-semibold">Pagos</h2>
                     <div class="mt-3 space-y-2 text-sm">
                         <div class="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
@@ -449,6 +501,8 @@
     </div>
     </div>
 
+    @vite('resources/js/pos-barcode-scanner.js')
+
     <script>
         const oldPosState = @js($initialPosState);
 
@@ -459,8 +513,15 @@
                 showCashModal: false,
                 openBranchId: oldPosState.branch_id || '{{ $branchId }}',
                 customerId: oldPosState.customer_id || '',
+                medicalOrderId: oldPosState.medical_order_id || '',
                 customerSearch: '',
                 customers: @js($customers->map(fn ($customer) => ['id' => $customer->id, 'name' => $customer->name, 'document' => $customer->document])->values()->all()),
+                medicalOrders: @js($medicalOrders->map(fn ($order) => [
+                    'id' => $order->id,
+                    'customer_id' => $order->customer_id,
+                    'patient_name' => $order->customer?->name,
+                    'ordered_at' => optional($order->ordered_at)->format('d/m/Y H:i'),
+                ])->values()->all()),
                 filteredCustomers: [],
                 showCustomerDropdown: false,
                 showProducts: true,
@@ -479,7 +540,10 @@
                 scannerKeyboardBuffer: '',
                 scannerKeyboardLastAt: 0,
                 scannerPollingTimer: null,
+                scannerPollingInProgress: false,
                 scannerSessionToken: '',
+                scannerSessionExpiresAt: '',
+                scannerRequestSequence: 0,
                 remoteScannerUrl: '',
                 scannerProtocol: window.location.protocol === 'https:' ? 'https://' : 'http://',
                 scannerHostInput: window.location.hostname || '',
@@ -506,6 +570,13 @@
                 },
                 get cartItemsCount() {
                     return this.cart.length;
+                },
+                get availableMedicalOrders() {
+                    if (!this.customerId) {
+                        return [];
+                    }
+
+                    return this.medicalOrders.filter(order => String(order.customer_id) === String(this.customerId));
                 },
                 get lineDiscountTotal() {
                     return this.cart.reduce((sum, item) => {
@@ -592,6 +663,7 @@
                         unit_price: this.toAmount(item.unit_price),
                         discount_type: this.toAmount(item.discount_percent) > 0 ? 'percent' : null,
                         discount_value: this.toAmount(item.discount_percent) > 0 ? this.toAmount(item.discount_percent) : 0,
+                        modifier_selections: item.modifier_selections || [],
                     })));
                 },
                 get paymentsPayload() {
@@ -607,6 +679,7 @@
                     this.openBranchId = this.branchId;
                     this.showCashModal = this.requiresCashSession;
                     this.initKeyboardScanner();
+                    this.restoreRemoteScannerSession();
                     const mediaQuery = window.matchMedia('(min-width: 1280px)');
                     const syncViewportState = (event) => {
                         this.isMobileViewport = !event.matches;
@@ -635,6 +708,13 @@
                         this.stopRemoteScannerPolling();
                         this.closeCameraScanner();
                     });
+                    window.addEventListener('focus', () => this.resumeRemoteScannerPolling());
+                    window.addEventListener('online', () => this.resumeRemoteScannerPolling());
+                    document.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) {
+                            this.resumeRemoteScannerPolling();
+                        }
+                    });
                     this.filterCustomers();
                 },
                 focusSearch() {
@@ -661,9 +741,13 @@
                     this.customerId = customer.id;
                     this.customerSearch = customer.name;
                     this.showCustomerDropdown = false;
+                    if (!this.availableMedicalOrders.some(order => String(order.id) === String(this.medicalOrderId))) {
+                        this.medicalOrderId = '';
+                    }
                 },
                 clearCustomer() {
                     this.customerId = null;
+                    this.medicalOrderId = '';
                     this.customerSearch = '';
                     this.filterCustomers();
                     this.showCustomerDropdown = false;
@@ -698,22 +782,53 @@
                     if (barcode === '') {
                         return;
                     }
+
+                    const requestSequence = ++this.scannerRequestSequence;
+                    this.search = barcode;
+                    this.$nextTick(() => {
+                        if (this.$refs.searchInput) {
+                            this.$refs.searchInput.value = barcode;
+                        }
+                    });
+                    this.showProducts = true;
+                    this.mobileSection = 'products';
+                    this.lastScannerMessage = `${sourceLabel}: buscando codigo ${barcode}...`;
+
                     try {
+                        await this.fetchProducts();
+                        if (requestSequence !== this.scannerRequestSequence) {
+                            return;
+                        }
+
                         const response = await fetch(`{{ route('pos.products.resolve') }}?${new URLSearchParams({ barcode, branch_id: this.branchId || '' }).toString()}`, {
                             headers: { 'Accept': 'application/json' },
                         });
+                        if (requestSequence !== this.scannerRequestSequence) {
+                            return;
+                        }
                         if (!response.ok) {
-                            this.lastScannerMessage = `${sourceLabel}: codigo ${barcode} no encontrado.`;
+                            const payload = await response.json().catch(() => ({}));
+                            if (requestSequence !== this.scannerRequestSequence) {
+                                return;
+                            }
+                            this.lastScannerMessage = payload.message
+                                ? `${sourceLabel}: ${payload.message}`
+                                : `${sourceLabel}: codigo ${barcode} no encontrado.`;
                             return;
                         }
                         const product = await response.json();
+                        if (requestSequence !== this.scannerRequestSequence) {
+                            return;
+                        }
                         this.addToCart(product);
-                        this.lastScannerMessage = `${sourceLabel}: agregado ${product.name}.`;
+                        this.lastScannerMessage = `${sourceLabel}: codigo ${barcode} encontrado. Agregado ${product.name}.`;
                         if (navigator.vibrate) {
                             navigator.vibrate(50);
                         }
                     } catch (error) {
-                        this.lastScannerMessage = `${sourceLabel}: error leyendo codigo.`;
+                        if (requestSequence === this.scannerRequestSequence) {
+                            this.lastScannerMessage = `${sourceLabel}: error leyendo codigo.`;
+                        }
                     }
                 },
                 async createRemoteScannerSession() {
@@ -735,17 +850,57 @@
                     const payload = await response.json();
                     this.scannerSessionToken = payload.token || '';
                     this.remoteScannerUrl = payload.remote_url || '';
+                    this.scannerSessionExpiresAt = payload.expires_at || '';
+                    this.persistRemoteScannerSession();
+                },
+                scannerStorageKey() {
+                    return `pos:remote-scanner:{{ auth()->id() }}`;
+                },
+                persistRemoteScannerSession() {
+                    if (!this.scannerSessionToken) {
+                        return;
+                    }
+                    localStorage.setItem(this.scannerStorageKey(), JSON.stringify({
+                        token: this.scannerSessionToken,
+                        remote_url: this.remoteScannerUrl,
+                        expires_at: this.scannerSessionExpiresAt,
+                    }));
+                },
+                restoreRemoteScannerSession() {
+                    try {
+                        const stored = JSON.parse(localStorage.getItem(this.scannerStorageKey()) || 'null');
+                        const expiresAt = Date.parse(stored?.expires_at || '');
+                        if (!stored?.token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+                            localStorage.removeItem(this.scannerStorageKey());
+                            return;
+                        }
+                        this.scannerSessionToken = stored.token;
+                        this.remoteScannerUrl = stored.remote_url || '';
+                        this.scannerSessionExpiresAt = stored.expires_at;
+                        this.startRemoteScannerPolling();
+                    } catch (error) {
+                        localStorage.removeItem(this.scannerStorageKey());
+                    }
                 },
                 startRemoteScannerPolling() {
                     this.stopRemoteScannerPolling();
                     if (!this.scannerSessionToken) {
                         return;
                     }
-                    this.scannerPollingTimer = window.setInterval(async () => {
+                    const poll = async () => {
+                        if (!this.scannerSessionToken || this.scannerPollingInProgress) {
+                            return;
+                        }
+                        this.scannerPollingInProgress = true;
                         try {
                             const response = await fetch(`{{ url('pos/scanner/session') }}/${this.scannerSessionToken}/poll`, {
                                 headers: { 'Accept': 'application/json' },
                             });
+                            if (response.status === 404) {
+                                this.clearRemoteScannerSession();
+                                this.lastScannerMessage = 'La sesion del lector expiro. Genera un enlace nuevo.';
+                                return;
+                            }
                             if (!response.ok) {
                                 return;
                             }
@@ -755,25 +910,43 @@
                                 await this.handleScannedBarcode(event.barcode, 'celular remoto');
                             }
                         } catch (error) {
-                            // Sin accion: en el siguiente ciclo reintenta.
+                            // Se reintenta al volver a programar el sondeo.
+                        } finally {
+                            this.scannerPollingInProgress = false;
+                            if (this.scannerSessionToken) {
+                                this.scannerPollingTimer = window.setTimeout(poll, 1000);
+                            }
                         }
-                    }, 1300);
+                    };
+                    poll();
+                },
+                resumeRemoteScannerPolling() {
+                    if (this.scannerSessionToken) {
+                        this.startRemoteScannerPolling();
+                    }
                 },
                 stopRemoteScannerPolling() {
                     if (this.scannerPollingTimer) {
-                        clearInterval(this.scannerPollingTimer);
+                        clearTimeout(this.scannerPollingTimer);
                         this.scannerPollingTimer = null;
                     }
                 },
+                clearRemoteScannerSession() {
+                    this.stopRemoteScannerPolling();
+                    this.scannerSessionToken = '';
+                    this.scannerSessionExpiresAt = '';
+                    this.remoteScannerUrl = '';
+                    localStorage.removeItem(this.scannerStorageKey());
+                },
                 async openRemoteScannerModal() {
                     this.showRemoteScannerModal = true;
-                    if (!this.scannerSessionToken) {
-                        try {
+                    try {
+                        if (!this.scannerSessionToken) {
                             await this.createRemoteScannerSession();
-                            this.startRemoteScannerPolling();
-                        } catch (error) {
-                            this.lastScannerMessage = 'No se pudo iniciar el escaner remoto.';
                         }
+                        this.startRemoteScannerPolling();
+                    } catch (error) {
+                        this.lastScannerMessage = 'No se pudo iniciar el escaner remoto.';
                     }
                 },
                 async copyRemoteScannerUrl() {
@@ -806,74 +979,28 @@
                 async startCameraScanner() {
                     this.showCameraModal = true;
                     this.cameraStatus = 'Iniciando camara...';
-                    const host = String(window.location.hostname || '').toLowerCase();
-                    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
-                    if (!window.isSecureContext && !isLocalhost) {
-                        this.cameraStatus = 'Camara bloqueada por el navegador: usa HTTPS o localhost para habilitarla.';
-                        alert('El navegador bloquea la camara en HTTP para IPs. Usa HTTPS o escaner remoto/manual.');
-                        return;
-                    }
-                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        this.cameraStatus = 'Este navegador no expone getUserMedia para camara.';
-                        return;
-                    }
-                    if (!('BarcodeDetector' in window)) {
-                        this.cameraStatus = 'Este navegador no soporta lector por camara. Usa lector USB o celular remoto.';
-                        return;
-                    }
                     try {
-                        this.scannerDetector = new BarcodeDetector({
-                            formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'],
-                        });
-                    } catch (error) {
-                        this.cameraStatus = 'No se pudo iniciar el detector.';
-                        return;
-                    }
-                    try {
-                        this.scannerStream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: { ideal: 'environment' } },
-                            audio: false,
-                        });
-                        this.$refs.cameraPreview.srcObject = this.scannerStream;
-                        this.cameraStatus = 'Camara activa. Apunta al codigo.';
-                        this.scannerLoopRunning = true;
-                        this.cameraScanLoop();
-                    } catch (error) {
-                        this.cameraStatus = 'No se pudo acceder a la camara. Revisa permisos del navegador para este sitio.';
-                    }
-                },
-                async cameraScanLoop() {
-                    if (!this.scannerLoopRunning || !this.scannerDetector || !this.$refs.cameraPreview) {
-                        return;
-                    }
-                    try {
-                        const detected = await this.scannerDetector.detect(this.$refs.cameraPreview);
-                        if (Array.isArray(detected) && detected.length > 0) {
-                            const barcode = String(detected[0].rawValue || '').trim();
-                            const now = Date.now();
-                            if (barcode !== '' && (barcode !== this.scannerLastCode || (now - this.scannerLastDetectedAt) > 1500)) {
-                                this.scannerLastCode = barcode;
-                                this.scannerLastDetectedAt = now;
-                                await this.handleScannedBarcode(barcode, 'camara');
-                            }
+                        if (!window.PosBarcodeCamera) {
+                            throw new Error('El lector de camara no se cargo. Recarga la pagina e intenta nuevamente.');
                         }
+
+                        await window.PosBarcodeCamera.start(
+                            this.$refs.cameraPreview,
+                            async barcode => {
+                                await this.handleScannedBarcode(barcode, 'camara');
+                                this.closeCameraScanner();
+                            },
+                            message => {
+                                this.cameraStatus = message;
+                            }
+                        );
                     } catch (error) {
-                        this.cameraStatus = 'Buscando codigo. Mejora iluminacion si no detecta.';
-                    }
-                    if (this.scannerLoopRunning) {
-                        requestAnimationFrame(() => this.cameraScanLoop());
+                        this.cameraStatus = error?.message || 'No se pudo acceder a la camara. Revisa los permisos.';
                     }
                 },
                 closeCameraScanner() {
                     this.showCameraModal = false;
-                    this.scannerLoopRunning = false;
-                    if (this.scannerStream) {
-                        this.scannerStream.getTracks().forEach(track => track.stop());
-                        this.scannerStream = null;
-                    }
-                    if (this.$refs.cameraPreview) {
-                        this.$refs.cameraPreview.srcObject = null;
-                    }
+                    window.PosBarcodeCamera?.stop();
                     this.cameraStatus = 'Camara detenida.';
                 },
                 async fetchProducts() {
@@ -896,19 +1023,84 @@
                         existing.quantity = nextQuantity;
                         return;
                     }
+                    const defaultSelections = this.defaultModifierSelections(product.modifier_groups || []);
                     this.cart.push({
                         product_id: product.id,
                         name: product.name,
                         sku: product.sku,
+                        product_type: product.product_type || 'simple',
                         quantity: 1,
-                        unit_price: parseFloat(product.sale_price),
+                        base_unit_price: parseFloat(product.sale_price),
+                        unit_price: parseFloat(product.sale_price) + this.modifierPriceDelta(product.modifier_groups || [], defaultSelections),
                         tax_rate: this.toAmount(product.tax_rate),
                         discount_percent: 0,
                         available_stock: this.toAmount(product.available_stock),
+                        uses_component_groups: Boolean(product.uses_component_groups),
+                        modifier_groups: product.modifier_groups || [],
+                        modifier_selections: defaultSelections,
                     });
                 },
+                modifierPriceDelta(groups, selections) {
+                    return (selections || []).reduce((sum, selection) => {
+                        const group = (groups || []).find(entry => String(entry.id) === String(selection.group_id));
+                        const option = (group?.options || []).find(entry => String(entry.id) === String(selection.option_id));
+                        return sum + this.toAmount(option?.price_delta);
+                    }, 0);
+                },
+                refreshModifierPrice(item) {
+                    item.unit_price = this.toAmount(item.base_unit_price)
+                        + this.modifierPriceDelta(item.modifier_groups || [], item.modifier_selections || []);
+                },
+                defaultModifierSelections(groups) {
+                    return groups.flatMap(group => (group.options || [])
+                        .filter(option => option.is_default)
+                        .map(option => ({
+                            group_id: group.id,
+                            option_id: option.id,
+                            action: group.selection_type === 'remove' ? 'remove' : 'include',
+                        })));
+                },
+                selectedOptionForGroup(item, groupId) {
+                    const selection = (item.modifier_selections || []).find(entry => String(entry.group_id) === String(groupId));
+                    return selection ? String(selection.option_id) : '';
+                },
+                isModifierSelected(item, groupId, optionId) {
+                    return (item.modifier_selections || []).some(entry =>
+                        String(entry.group_id) === String(groupId)
+                        && String(entry.option_id) === String(optionId)
+                    );
+                },
+                selectSingleGroupOption(item, group, optionId) {
+                    item.modifier_selections = (item.modifier_selections || [])
+                        .filter(entry => String(entry.group_id) !== String(group.id));
+                    if (optionId !== '') {
+                        item.modifier_selections.push({
+                            group_id: group.id,
+                            option_id: Number(optionId),
+                            action: 'include',
+                        });
+                    }
+                    this.refreshModifierPrice(item);
+                },
+                toggleModifierOption(item, group, option, checked) {
+                    item.modifier_selections = (item.modifier_selections || [])
+                        .filter(entry => !(
+                            String(entry.group_id) === String(group.id)
+                            && String(entry.option_id) === String(option.id)
+                        ));
+                    if (checked) {
+                        item.modifier_selections.push({
+                            group_id: group.id,
+                            option_id: option.id,
+                            action: group.selection_type === 'remove' ? 'remove' : 'include',
+                        });
+                    }
+                    this.refreshModifierPrice(item);
+                },
                 sanitizeItemQuantity(item) {
-                    const quantity = Math.max(0.001, this.toAmount(item.quantity));
+                    const minimum = item.product_type === 'serialized' ? 1 : 0.001;
+                    const rawQuantity = Math.max(minimum, this.toAmount(item.quantity));
+                    const quantity = item.product_type === 'serialized' ? Math.floor(rawQuantity) : rawQuantity;
                     const available = this.toAmount(item.available_stock);
                     if (available > 0 && quantity > available) {
                         item.quantity = available;
@@ -921,6 +1113,7 @@
                 },
                 resetCheckoutState() {
                     this.customerId = null;
+                    this.medicalOrderId = '';
                     this.customerSearch = '';
                     this.cart = [];
                     this.globalDiscount = 0;

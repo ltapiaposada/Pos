@@ -36,24 +36,21 @@ class StorefrontController extends Controller
         $cacheKey = 'storefront:products:company:'.($companyId ?? 'default').':restaurant:'.(int) $isRestaurantCatalog.':v'.$version.':q:'.md5($normalizedSearch).':p:'.$page;
         $ttl = now()->addMinutes((int) config('pos.cache.storefront_products_ttl_minutes', 15));
 
-        $products = Cache::remember($cacheKey, $ttl, function () use ($search, $isRestaurantCatalog) {
+        $products = Cache::remember($cacheKey, $ttl, function () use ($search) {
             $with = [
                 'category',
                 'tax',
                 'kitItems.componentProduct:id,name',
+                'modifierGroups.options' => function ($query) {
+                    $query->where('is_active', true)
+                        ->with('product:id,name,unit');
+                },
                 'variants' => function ($query) {
                     $query->where('is_active', true)
                         ->where('is_visible_ecommerce', true)
                         ->orderBy('name');
                 },
             ];
-
-            if ($isRestaurantCatalog) {
-                $with['modifierGroups.options'] = function ($query) {
-                    $query->where('is_active', true)
-                        ->with('product:id,name,unit');
-                };
-            }
 
             return Product::query()
                 ->with($with)
@@ -145,7 +142,7 @@ class StorefrontController extends Controller
             ? $product
             : ($product->parentProduct?->modifierGroups->isNotEmpty() ? $product->parentProduct : $product);
 
-        if ($isRestaurantCatalog && $modifierProduct->modifierGroups->isNotEmpty()) {
+        if ($modifierProduct->modifierGroups->isNotEmpty()) {
             $normalizedSelections = app(ProductModifierSelectionService::class)
                 ->normalizeStorefrontInput($modifierProduct, (array) ($data['modifier_groups'] ?? []));
         }
@@ -165,11 +162,7 @@ class StorefrontController extends Controller
         $cart[$lineKey] = $existing;
         $this->storeCart($request, $cart);
 
-        $target = $isRestaurantCatalog
-            ? route('shop.cart')
-            : url()->previous();
-
-        return redirect()->to($target)->with('status', 'Producto agregado al carrito.');
+        return redirect()->back()->with('status', 'Producto agregado al carrito.');
     }
 
     public function updateCartItem(Request $request, string $lineKey): RedirectResponse
@@ -246,7 +239,7 @@ class StorefrontController extends Controller
             $request->session()->forget('shop.cart');
 
             return redirect()->route('shop.orders.show', $order->id)
-                ->with('status', 'Pedido recibido correctamente. El restaurante lo revisará antes de enviarlo a cocina.');
+                ->with('status', 'Pedido recibido correctamente. El restaurante lo revisara antes de enviarlo a cocina.');
         }
 
         $order = $orderService->createOrder(
@@ -268,7 +261,7 @@ class StorefrontController extends Controller
             })->values()->all(),
             customerId: $customer->id,
             userId: $request->user()->id,
-            paymentMethod: $request->input('payment_method', 'card'),
+            paymentMethod: $request->input('payment_method', 'transfer'),
             paymentReference: $request->input('payment_reference'),
             deliveryAddress: $request->input('address'),
             couponCode: $request->input('coupon_code'),
@@ -278,7 +271,7 @@ class StorefrontController extends Controller
         $request->session()->forget($this->cartSessionKey($request));
         $request->session()->forget('shop.cart');
 
-        return redirect()->route('shop.orders.show', $order->id)->with('status', 'Pedido creado correctamente.');
+        return redirect()->route('shop.orders.show', $order->id)->with('status', 'Pedido recibido correctamente. Validaremos el pago o la modalidad de entrega antes de confirmarlo.');
     }
 
     public function orders(Request $request): View
@@ -337,7 +330,7 @@ class StorefrontController extends Controller
         }
 
         $sale = Sale::query()
-            ->with(['items', 'payments', 'branch'])
+            ->with(['items.serials', 'items.lots.lot', 'payments', 'branch'])
             ->when($companyId !== null, fn ($query) => $query->where('company_id', $companyId))
             ->findOrFail($sale);
 
@@ -607,7 +600,7 @@ class StorefrontController extends Controller
         $lines = [
             'Origen: Pedido web restaurante',
             'Tipo de pedido: '.($orderType === RestaurantOrder::TYPE_TAKEAWAY ? 'Para llevar' : 'Domicilio'),
-            'Metodo de pago sugerido: '.$this->paymentMethodLabel((string) $request->input('payment_method', 'card')),
+            'Metodo de pago solicitado: '.$this->paymentMethodLabel((string) $request->input('payment_method', 'transfer')),
         ];
 
         if ($reference = trim((string) $request->input('payment_reference'))) {
@@ -632,11 +625,10 @@ class StorefrontController extends Controller
     private function paymentMethodLabel(string $method): string
     {
         return match ($method) {
-            'card' => 'Tarjeta',
-            'transfer' => 'Transferencia',
-            'qr' => 'QR',
+            'transfer' => 'Transferencia por validar',
+            'qr' => 'QR por validar',
             'contraentrega' => 'Contraentrega',
-            default => 'Otro',
+            default => 'Pago manual',
         };
     }
 

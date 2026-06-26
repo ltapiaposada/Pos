@@ -16,6 +16,8 @@ class SettingsSeeder extends Seeder
             'address' => 'Calle Principal 123',
             'phone' => '555-0101',
             'currency' => 'USD',
+            'ecommerce_flat_shipping' => (float) config('pos.ecommerce_flat_shipping', 0),
+            'ecommerce_coupons' => (array) config('pos.ecommerce_coupons', []),
             'allow_negative_stock' => false,
             'default_tax_id' => 1,
         ];

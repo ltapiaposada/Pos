@@ -2,11 +2,22 @@
 
 Sistema POS web con inventario, ventas, caja, reportes y contabilidad.
 
+## Documentacion operativa y comercial
+- [Instalacion](docs/INSTALLATION.md)
+- [Backup y restauracion](docs/BACKUP-RESTORE.md)
+- [Checklist de salida a produccion](docs/GO-LIVE-CHECKLIST.md)
+- [Despliegue base con Docker](docs/DEPLOYMENT.md)
+- [Alcance comercial del producto](docs/PRODUCT-SCOPE.md)
+- [Planes y soporte](docs/PLANS-AND-SUPPORT.md)
+- [Licencia comercial base](LICENSE.md)
+- [Terminos base](TERMS.md)
+- [Politica base de privacidad](PRIVACY.md)
+
 ## Requisitos
 - PHP 8.2+
 - Composer
 - Node.js 18+
-- PostgreSQL
+- MySQL 8+
 
 ## Instalacion inicial (primera vez)
 1. Instalar dependencias PHP:
@@ -14,12 +25,13 @@ Sistema POS web con inventario, ventas, caja, reportes y contabilidad.
 2. Crear archivo de entorno:
    - Windows: `copy .env.example .env`
 3. Configurar base de datos en `.env`:
-   - `DB_CONNECTION=pgsql`
+   - `DB_CONNECTION=mysql`
    - `DB_HOST=127.0.0.1`
-   - `DB_PORT=5432`
+   - `DB_PORT=3306`
    - `DB_DATABASE=pos`
-   - `DB_USERNAME=postgres`
+   - `DB_USERNAME=root`
    - `DB_PASSWORD=secret`
+   - `SEED_DEMO_DATA=true`
 4. Generar llave de aplicacion:
    - `php artisan key:generate`
 5. Ejecutar migraciones + datos iniciales (kick off):
@@ -52,12 +64,21 @@ Al correr `migrate --seed` o `migrate:fresh --seed`, se crean datos base:
 - Sucursal principal por defecto.
 - Categorias base por defecto.
 - Roles y permisos base.
-- Usuarios por defecto:
+- Contactos operativos base:
+  - `Cliente Mostrador` con identificacion `CF`.
+- Si `SEED_DEMO_DATA=true`, tambien se crean:
   - `admin@pos.test` / `password`
   - `supervisor@pos.test` / `password`
   - `cashier@pos.test` / `password`
-- Cliente por defecto:
-  - `Consumidor final` con identificacion `222222222222`.
+  - `Empresa Demo` con identificacion `NIT-123456`.
+  - `Proveedor Base` con identificacion `NIT-PROV-001`.
+  - catalogo demo e inventario de ejemplo
+- Si `SEED_DEMO_DATA=false`, no se crean usuarios demo.
+- Si `SEED_DEMO_DATA=false`, tampoco se crean catalogo, inventario ni contactos demo.
+- Si `SEED_DEMO_DATA=false` y defines estas variables antes de migrar, se crea un administrador inicial:
+  - `POS_INITIAL_ADMIN_NAME`
+  - `POS_INITIAL_ADMIN_EMAIL`
+  - `POS_INITIAL_ADMIN_PASSWORD`
 
 ## Configuracion de imagenes (Cloudflare R2)
 En `.env`:
@@ -78,10 +99,40 @@ En `.env`:
 4. Cerrar caja.
 5. Revisar facturas y reportes.
 
+## Moneda por empresa
+- La moneda operativa de ventas y ecommerce sale de `Configuracion del negocio > Moneda`.
+- Si una empresa no define moneda, el sistema usa el valor por defecto de `config/pos.php`.
+
+## Configuracion ecommerce por empresa
+- El envio fijo del checkout sale de `Configuracion del negocio > Envio fijo e-commerce`.
+- Los cupones del checkout se editan en `Configuracion del negocio > Cupones e-commerce` usando `CODIGO=PORCENTAJE`.
+- Si una empresa no define estos valores, el sistema usa los defaults de `config/pos.php`.
+
+## Docker
+- Puedes levantar una instalacion base con `docker compose up -d --build`.
+- La guia operativa esta en [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+## Preparacion de pre-entrega
+- Para sanear una base existente antes de entregar, usa `php artisan app:prepare-go-live`.
+- Ejemplo: `php artisan app:prepare-go-live --company=1 --admin-email=admin@cliente.test --admin-password=Secret123! --disable-demo-users`
+
+## Alcance comercial actual del ecommerce
+El modulo ecommerce debe ofrecerse hoy como:
+- catalogo online con carrito
+- pedido web con validacion manual
+- transferencia, QR y contraentrega
+
+No debe ofrecerse todavia como:
+- pasarela de pago automatica
+- checkout con tarjeta integrado
+- conciliacion automatica de pagos
+
 ## Pruebas
 - `php artisan test`
+- `php artisan app:doctor`
+- `php artisan app:prepare-go-live --company=1 --admin-email=admin@cliente.test --admin-password=Secret123! --disable-demo-users`
 
-## Solucion de problemas (PostgreSQL)
-- Si aparece `could not find driver (pgsql)`, habilita `pdo_pgsql` y `pgsql` en `php.ini`.
+## Solucion de problemas (MySQL)
+- Si aparece `could not find driver (mysql)`, habilita `pdo_mysql` en `php.ini`.
 - Verifica modulos cargados con:
-  - `php -m | findstr /I "pgsql"`
+  - `php -m | findstr /I "mysql"`

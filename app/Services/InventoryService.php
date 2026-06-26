@@ -8,6 +8,7 @@ use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\ProductKitItem;
 use App\Models\Setting;
+use App\Support\UnitConverter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -35,11 +36,17 @@ class InventoryService
         }
 
         $products->each(function (Product $product): void {
-            $product->loadMissing('kitItems.componentProduct');
+            $product->loadMissing(['kitItems.componentProduct', 'modifierGroups.options.product']);
         });
 
         $inventoryIds = $products->flatMap(function (Product $product) {
             if ($product->product_type === Product::TYPE_KIT) {
+                if ($product->uses_component_groups) {
+                    return $product->modifierGroups
+                        ->flatMap(fn ($group) => $group->options->pluck('product_id'))
+                        ->filter();
+                }
+
                 return $product->kitItems->pluck('component_product_id');
             }
 
@@ -54,18 +61,33 @@ class InventoryService
         $available = [];
 
         foreach ($products as $product) {
+            if (! $product->tracksInventory()) {
+                $available[$product->id] = 999999999.0;
+                continue;
+            }
+
             if ($product->product_type !== Product::TYPE_KIT) {
                 $available[$product->id] = max(0, round((float) ($stockByProduct[$product->id] ?? 0), 6));
                 continue;
             }
 
             if ($product->kitItems->isEmpty()) {
+                if ($product->uses_component_groups && $product->modifierGroups->isNotEmpty()) {
+                    $available[$product->id] = 999999999.0;
+                    continue;
+                }
+
                 $available[$product->id] = 0.0;
                 continue;
             }
 
             $componentAvailability = $product->kitItems->map(function (ProductKitItem $item) use ($stockByProduct) {
-                $requiredInStockUnit = (float) $item->quantity * (float) ($item->component_unit_factor ?? 1);
+                $factor = UnitConverter::resolveFactor(
+                    $item->component_unit,
+                    $item->componentProduct?->unit,
+                    (float) ($item->component_unit_factor ?? 1)
+                );
+                $requiredInStockUnit = (float) $item->quantity * $factor;
                 if ($requiredInStockUnit <= 0) {
                     return 0.0;
                 }

@@ -3,8 +3,13 @@
 /public/build
 /public/hot
 /public/storage
+/public/cart.blade.zip
 /storage/*.key
 /storage/pail
+/storage/edge-headless
+/storage/edge-headless-user
+/storage/edge-headless-user-v*
+/storage/edge-pdf-profile
 /vendor
 .env
 .env.backup
@@ -16,6 +21,7 @@ Homestead.yaml
 npm-debug.log
 yarn-error.log
 /auth.json
+/test_write*.txt
 /.fleet
 /.idea
 /.nova

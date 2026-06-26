@@ -432,7 +432,7 @@
             @php
                 $variantOptions = $product->variants;
                 $hasVariantOptions = $variantOptions->isNotEmpty();
-                $modifierGroups = $isRestaurantCatalog
+                $modifierGroups = ($product->uses_component_groups || $isRestaurantCatalog)
                     ? $product->modifierGroups->filter(fn ($group) => $group->options->isNotEmpty())->values()
                     : collect();
                 $hasMenuCustomizer = $modifierGroups->isNotEmpty();
@@ -484,6 +484,8 @@
                                             <li>{{ rtrim(rtrim(number_format($component['quantity'], 3, '.', ''), '0'), '.') }} x {{ $component['name'] }}</li>
                                         @endforeach
                                     </ul>
+                                @elseif ($product->uses_component_groups)
+                                    Este kit se configura seleccionando sus componentes.
                                 @else
                                     Este kit no tiene componentes configurados.
                                 @endif

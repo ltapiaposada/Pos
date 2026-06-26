@@ -7,7 +7,9 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Tax;
 use App\Services\ImageStorageService;
+use App\Support\CompanyRules;
 use App\Support\StorefrontCache;
+use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +20,9 @@ class ProductController extends Controller
     {
         $query = Product::query()->with(['category', 'tax', 'parentProduct']);
 
-        if ($search = $request->get('q')) {
+        $search = trim((string) $request->query('q', ''));
+
+        if ($search !== '') {
             $query->where(function ($builder) use ($search) {
                 $builder->where('name', 'like', "%{$search}%")
                     ->orWhere('sku', 'like', "%{$search}%")
@@ -33,15 +37,25 @@ class ProductController extends Controller
 
     public function create()
     {
-        $categories = Category::query()->orderBy('name')->get();
-        $taxes = Tax::query()->where('is_active', true)->orderBy('name')->get();
+        $companyId = CompanyRules::currentCompanyId();
+        $categories = Category::query()
+            ->forCompany($companyId)
+            ->orderBy('name')
+            ->get();
+        $taxes = Tax::query()
+            ->forCompany($companyId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
         $parentCandidates = Product::query()
+            ->forCompany($companyId)
             ->where('product_type', '!=', Product::TYPE_VARIANT)
             ->orderBy('name')
             ->get(['id', 'name', 'sku']);
         $kitComponentCandidates = Product::query()
+            ->forCompany($companyId)
             ->orderBy('name')
-            ->get(['id', 'name', 'sku', 'unit']);
+            ->get(['id', 'name', 'sku', 'barcode', 'unit']);
 
         return view('products.create', compact('categories', 'taxes', 'parentCandidates', 'kitComponentCandidates'));
     }
@@ -54,6 +68,9 @@ class ProductController extends Controller
         unset($payload['kit_items']);
         unset($payload['modifier_groups']);
         unset($payload['image_file']);
+        $payload['company_id'] = CompanyRules::currentCompanyId();
+        $payload['uses_component_groups'] = ($payload['product_type'] ?? null) === Product::TYPE_KIT
+            && (bool) ($payload['uses_component_groups'] ?? false);
 
         if (($payload['product_type'] ?? Product::TYPE_SIMPLE) !== Product::TYPE_VARIANT) {
             $payload['parent_product_id'] = null;
@@ -72,8 +89,12 @@ class ProductController extends Controller
 
         DB::transaction(function () use ($payload, $kitItems, $modifierGroups): void {
             $product = Product::query()->create($payload);
-            $this->syncKitItems($product, $kitItems);
-            $this->syncModifierGroups($product, $modifierGroups);
+            $this->syncKitItems($product, $product->uses_component_groups ? collect() : $kitItems);
+            if ($product->uses_component_groups) {
+                $this->syncModifierGroups($product, $modifierGroups);
+            } elseif ($product->product_type === Product::TYPE_KIT) {
+                $this->syncModifierGroups($product, collect());
+            }
         });
         $this->bumpStorefrontProductsCacheVersion();
 
@@ -84,17 +105,27 @@ class ProductController extends Controller
     {
         $product->load(['kitItems', 'modifierGroups.options']);
 
-        $categories = Category::query()->orderBy('name')->get();
-        $taxes = Tax::query()->where('is_active', true)->orderBy('name')->get();
+        $companyId = (int) ($product->company_id ?? CompanyRules::currentCompanyId());
+        $categories = Category::query()
+            ->forCompany($companyId)
+            ->orderBy('name')
+            ->get();
+        $taxes = Tax::query()
+            ->forCompany($companyId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
         $parentCandidates = Product::query()
+            ->forCompany($companyId)
             ->where('product_type', '!=', Product::TYPE_VARIANT)
             ->whereKeyNot($product->id)
             ->orderBy('name')
             ->get(['id', 'name', 'sku']);
         $kitComponentCandidates = Product::query()
+            ->forCompany($companyId)
             ->whereKeyNot($product->id)
             ->orderBy('name')
-            ->get(['id', 'name', 'sku', 'unit']);
+            ->get(['id', 'name', 'sku', 'barcode', 'unit']);
 
         return view('products.edit', compact('product', 'categories', 'taxes', 'parentCandidates', 'kitComponentCandidates'));
     }
@@ -107,6 +138,8 @@ class ProductController extends Controller
         unset($payload['kit_items']);
         unset($payload['modifier_groups']);
         unset($payload['image_file']);
+        $payload['uses_component_groups'] = ($payload['product_type'] ?? null) === Product::TYPE_KIT
+            && (bool) ($payload['uses_component_groups'] ?? false);
 
         if (($payload['product_type'] ?? Product::TYPE_SIMPLE) !== Product::TYPE_VARIANT) {
             $payload['parent_product_id'] = null;
@@ -125,8 +158,12 @@ class ProductController extends Controller
 
         DB::transaction(function () use ($product, $payload, $kitItems, $modifierGroups): void {
             $product->update($payload);
-            $this->syncKitItems($product, $kitItems);
-            $this->syncModifierGroups($product, $modifierGroups);
+            $this->syncKitItems($product, $product->uses_component_groups ? collect() : $kitItems);
+            if ($product->uses_component_groups) {
+                $this->syncModifierGroups($product, $modifierGroups);
+            } elseif ($product->product_type === Product::TYPE_KIT) {
+                $this->syncModifierGroups($product, collect());
+            }
         });
         $this->bumpStorefrontProductsCacheVersion();
 
@@ -155,12 +192,18 @@ class ProductController extends Controller
                 $componentUnit = $item['component_unit']
                     ?? Product::query()->whereKey($componentProductId)->value('unit')
                     ?? null;
+                $stockUnit = Product::query()->whereKey($componentProductId)->value('unit');
+                $factor = UnitConverter::resolveFactor(
+                    $componentUnit,
+                    $stockUnit,
+                    (float) ($item['component_unit_factor'] ?? 1)
+                );
 
                 return [
                     'component_product_id' => $componentProductId,
                     'quantity' => (float) $item['quantity'],
                     'component_unit' => $componentUnit,
-                    'component_unit_factor' => (float) ($item['component_unit_factor'] ?? 1),
+                    'component_unit_factor' => $factor,
                 ];
             })
             ->filter(fn (array $item): bool => $item['component_product_id'] > 0 && $item['quantity'] > 0 && $item['component_unit_factor'] > 0)
@@ -205,15 +248,23 @@ class ProductController extends Controller
                     $label = (string) Product::query()->whereKey($optionData['product_id'])->value('name');
                 }
 
+                $inventoryUnit = $optionData['inventory_unit']
+                    ?? Product::query()->whereKey($optionData['product_id'] ?? null)->value('unit')
+                    ?? null;
+                $stockUnit = Product::query()->whereKey($optionData['product_id'] ?? null)->value('unit');
+                $factor = UnitConverter::resolveFactor(
+                    $inventoryUnit,
+                    $stockUnit,
+                    (float) ($optionData['inventory_unit_factor'] ?? 1)
+                );
+
                 $option = $group->options()->updateOrCreate(
                     ['id' => $optionData['id'] ?? null],
                     [
                         'product_id' => $optionData['product_id'] ?? null,
                         'inventory_quantity' => filled($optionData['inventory_quantity'] ?? null) ? (float) $optionData['inventory_quantity'] : null,
-                        'inventory_unit' => $optionData['inventory_unit']
-                            ?? Product::query()->whereKey($optionData['product_id'] ?? null)->value('unit')
-                            ?? null,
-                        'inventory_unit_factor' => (float) ($optionData['inventory_unit_factor'] ?? 1),
+                        'inventory_unit' => $inventoryUnit,
+                        'inventory_unit_factor' => $factor,
                         'label' => $label,
                         'price_delta' => (float) ($optionData['price_delta'] ?? 0),
                         'is_default' => (bool) ($optionData['is_default'] ?? false),
@@ -235,4 +286,5 @@ class ProductController extends Controller
     {
         StorefrontCache::bumpProductsVersion();
     }
+
 }
