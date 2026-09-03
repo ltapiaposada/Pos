@@ -22,7 +22,9 @@
    - `DB_PORT=3306`
    - `DB_DATABASE=pos`
    - `DB_USERNAME=root`
-   - `DB_PASSWORD=secret`
+   - `DB_PASSWORD=` (en una instalacion local nueva de Homebrew normalmente queda vacio)
+   - `MAIL_MAILER=log` para desarrollo local sin servicio de correo
+   - `IMAGE_DISK=local` para guardar imagenes localmente
 4. Generar la llave:
    - `php artisan key:generate`
 5. Ejecutar migraciones y seeders:
@@ -95,6 +97,11 @@ Opciones comunes:
 ## Docker Compose
 - Existe un despliegue base con `Dockerfile` y `docker-compose.yml`.
 - Consulta [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) para levantarlo con MySQL.
+
+## macOS
+
+Para mover el proyecto completo a una Mac, incluyendo base de datos, archivos
+subidos y configuracion, sigue [MACOS-MIGRATION.md](MACOS-MIGRATION.md).
 
 ## Nota comercial
 El modulo ecommerce actual debe desplegarse como:

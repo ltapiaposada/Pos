@@ -4,6 +4,7 @@ Sistema POS web con inventario, ventas, caja, reportes y contabilidad.
 
 ## Documentacion operativa y comercial
 - [Instalacion](docs/INSTALLATION.md)
+- [Migracion a macOS](docs/MACOS-MIGRATION.md)
 - [Backup y restauracion](docs/BACKUP-RESTORE.md)
 - [Checklist de salida a produccion](docs/GO-LIVE-CHECKLIST.md)
 - [Despliegue base con Docker](docs/DEPLOYMENT.md)
@@ -42,6 +43,21 @@ Sistema POS web con inventario, ventas, caja, reportes y contabilidad.
    - `npm run build`
 8. Iniciar servidor:
    - `php artisan serve`
+
+## Instalar en macOS desde Git
+La guia completa, incluyendo como trasladar datos y archivos reales, esta en
+[docs/MACOS-MIGRATION.md](docs/MACOS-MIGRATION.md). Para una instalacion nueva
+con MySQL ya configurado en la Mac:
+
+```bash
+git clone <URL-DEL-REPOSITORIO> pos
+cd pos
+./scripts/setup-macos.sh --demo
+php artisan serve
+```
+
+`--demo` crea una base de datos nueva con datos de ejemplo. No lo uses al
+restaurar una base de datos existente.
 
 ## Levantar el proyecto (uso diario)
 1. Iniciar backend:
