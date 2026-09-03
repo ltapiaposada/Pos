@@ -93,6 +93,14 @@
             flex: 0 0 auto;
         }
 
+        .shop-brand__logo {
+            width: 32px;
+            height: 32px;
+            flex: 0 0 auto;
+            border-radius: 6px;
+            object-fit: contain;
+        }
+
         .shop-brand__copy {
             min-width: 0;
             display: flex;
@@ -426,17 +434,22 @@
         $publicCompany = \App\Support\CompanyContext::publicCompany();
         $business = \App\Models\Setting::getValue('business', [], $publicCompany?->id);
         $businessName = $business['name'] ?? $publicCompany?->name ?? config('app.name', 'Tienda');
+        $businessLogoUrl = $business['logo_url'] ?? null;
     @endphp
 
     <header class="shop-header">
         <div class="shop-header__inner">
             <a class="shop-brand" href="{{ route('shop.index') }}" aria-label="{{ $businessName }}">
-                <svg class="shop-brand__mark" viewBox="0 0 32 32" aria-hidden="true">
-                    <rect x="4" y="4" width="12" height="12" rx="4" fill="#1E4A3D"/>
-                    <rect x="16" y="4" width="12" height="12" rx="4" fill="#A9781F"/>
-                    <rect x="4" y="16" width="12" height="12" rx="4" fill="#9C4B34"/>
-                    <rect x="16" y="16" width="12" height="12" rx="4" fill="#3E4F63"/>
-                </svg>
+                @if ($businessLogoUrl)
+                    <img src="{{ $businessLogoUrl }}" alt="" class="shop-brand__logo">
+                @else
+                    <svg class="shop-brand__mark" viewBox="0 0 32 32" aria-hidden="true">
+                        <rect x="4" y="4" width="12" height="12" rx="4" fill="#1E4A3D"/>
+                        <rect x="16" y="4" width="12" height="12" rx="4" fill="#A9781F"/>
+                        <rect x="4" y="16" width="12" height="12" rx="4" fill="#9C4B34"/>
+                        <rect x="16" y="16" width="12" height="12" rx="4" fill="#3E4F63"/>
+                    </svg>
+                @endif
                 <span class="shop-brand__copy">
                     <span class="shop-brand__eyebrow">Tienda oficial</span>
                     <span class="shop-brand__name">{{ $businessName }}</span>
