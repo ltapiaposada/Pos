@@ -73,6 +73,9 @@
                     @error('order')
                         <div class="alert alert-error mb-3 text-sm">{{ $message }}</div>
                     @enderror
+                    @error('status')
+                        <div class="alert alert-error mb-3 text-sm">{{ $message }}</div>
+                    @enderror
                     <form method="POST" action="{{ route('ecommerce-admin.orders.status', $order) }}" class="space-y-3">
                         @csrf
                         @method('PATCH')
@@ -86,6 +89,16 @@
                         </div>
                         <button class="btn btn-primary btn-sm w-full">Actualizar estado</button>
                     </form>
+                    @if (! $order->invoiced_at || ! $order->accounted_at)
+                        <form method="POST" action="{{ route('ecommerce-admin.orders.invoice', $order) }}" class="mt-3">
+                            @csrf
+                            <button type="submit" class="btn btn-outline btn-sm w-full" onclick="return confirm('Registrar venta o factura de este pedido?')">
+                                {{ ! $order->invoiced_at ? 'Registrar venta / factura' : 'Contabilizar factura' }}
+                            </button>
+                        </form>
+                    @else
+                        <p class="mt-3 text-xs text-success">Pedido facturado y contabilizado.</p>
+                    @endif
                 </div>
             </div>
 

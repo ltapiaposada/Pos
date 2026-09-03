@@ -1,45 +1,10 @@
-<x-guest-layout>
-    <div class="mb-6">
-        <h1 class="text-xl font-semibold tracking-tight text-base-content">Restablecer contrasena</h1>
-        <p class="mt-1 text-sm text-base-content/60">Define una contrasena segura para tu cuenta.</p>
-    </div>
-
-    <form method="POST" action="{{ route('password.store') }}" class="space-y-4">
+<x-auth-shell title="Restablece tu contrasena" subtitle="Define una contrasena segura para tu cuenta.">
+    <form method="POST" action="{{ route('password.store') }}">
         @csrf
-
-        <!-- Password Reset Token -->
         <input type="hidden" name="token" value="{{ $request->route('token') }}">
-
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" value="Correo electronico" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email', $request->email)" required autofocus autocomplete="username" readonly />
-            <p class="mt-1 text-xs text-base-content/60">Este correo debe coincidir con el del enlace recibido.</p>
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <!-- Password -->
-        <div>
-            <x-input-label for="password" value="Nueva contrasena" />
-            <x-text-input id="password" class="block mt-1 w-full" type="password" name="password" required autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Confirm Password -->
-        <div>
-            <x-input-label for="password_confirmation" value="Confirmar contrasena" />
-
-            <x-text-input id="password_confirmation" class="block mt-1 w-full"
-                                type="password"
-                                name="password_confirmation" required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end">
-            <x-primary-button>
-                Restablecer contrasena
-            </x-primary-button>
-        </div>
+        <div class="auth-field"><label for="email">Correo electronico</label><div class="auth-input-wrap"><input id="email" type="email" name="email" value="{{ old('email', $request->email) }}" required autofocus autocomplete="username" readonly></div>@error('email') <div class="auth-error">{{ $message }}</div> @enderror</div>
+        <div class="auth-field"><label for="password">Nueva contrasena</label><div class="auth-input-wrap"><input id="password" class="auth-password" type="password" name="password" placeholder="••••••••" required autocomplete="new-password"><button type="button" class="auth-toggle" data-auth-toggle="password" aria-label="Mostrar contrasena">Mostrar</button></div>@error('password') <div class="auth-error">{{ $message }}</div> @enderror</div>
+        <div class="auth-field"><label for="password_confirmation">Confirmar contrasena</label><div class="auth-input-wrap"><input id="password_confirmation" class="auth-password" type="password" name="password_confirmation" placeholder="••••••••" required autocomplete="new-password"><button type="button" class="auth-toggle" data-auth-toggle="password_confirmation" aria-label="Mostrar contrasena">Mostrar</button></div>@error('password_confirmation') <div class="auth-error">{{ $message }}</div> @enderror</div>
+        <button type="submit" class="auth-submit">Restablecer contrasena</button>
     </form>
-</x-guest-layout>
+</x-auth-shell>

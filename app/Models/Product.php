@@ -39,6 +39,7 @@ class Product extends Model
         'product_type',
         'uses_component_groups',
         'parent_product_id',
+        'variant_attributes',
         'cost_price',
         'sale_price',
         'is_active',
@@ -51,6 +52,7 @@ class Product extends Model
         'cost_price' => 'decimal:2',
         'sale_price' => 'decimal:2',
         'uses_component_groups' => 'boolean',
+        'variant_attributes' => 'array',
     ];
 
     public const TYPE_SIMPLE = 'simple';

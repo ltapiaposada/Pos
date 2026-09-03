@@ -310,6 +310,28 @@ class EcommerceFlowTest extends TestCase
         $this->assertSame(8.0, (float) Inventory::query()->where('product_id', $product->id)->value('stock'));
     }
 
+    public function test_storefront_product_image_opens_large_preview_modal(): void
+    {
+        Product::query()->create([
+            'company_id' => $this->company->id,
+            'name' => 'Producto con foto',
+            'sku' => 'IMG-001',
+            'image_url' => 'https://example.test/producto.jpg',
+            'sale_price' => 100,
+            'cost_price' => 50,
+            'is_active' => true,
+            'is_visible_ecommerce' => true,
+        ]);
+
+        $this->get(route('shop.index'))
+            ->assertOk()
+            ->assertSee('class="product-image-trigger"', false)
+            ->assertSee('data-product-image="https://example.test/producto.jpg"', false)
+            ->assertSee('id="product-image-modal"', false)
+            ->assertSee('id="product-image-modal-img"', false)
+            ->assertSee('Ver imagen');
+    }
+
     public function test_storefront_shows_variant_selector_for_parent_product(): void
     {
         $branch = Branch::query()->create([

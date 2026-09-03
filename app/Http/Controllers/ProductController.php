@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ProductRequest;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductVariantAttribute;
 use App\Models\Tax;
 use App\Services\ImageStorageService;
 use App\Support\CompanyRules;
@@ -56,8 +57,13 @@ class ProductController extends Controller
             ->forCompany($companyId)
             ->orderBy('name')
             ->get(['id', 'name', 'sku', 'barcode', 'unit']);
+        $variantAttributes = ProductVariantAttribute::query()
+            ->forCompany($companyId)
+            ->with(['values' => fn ($query) => $query->orderBy('value')])
+            ->orderBy('name')
+            ->get();
 
-        return view('products.create', compact('categories', 'taxes', 'parentCandidates', 'kitComponentCandidates'));
+        return view('products.create', compact('categories', 'taxes', 'parentCandidates', 'kitComponentCandidates', 'variantAttributes'));
     }
 
     public function store(ProductRequest $request, ImageStorageService $imageStorage)
@@ -65,14 +71,23 @@ class ProductController extends Controller
         $payload = $request->validated();
         $kitItems = collect($payload['kit_items'] ?? []);
         $modifierGroups = collect($payload['modifier_groups'] ?? []);
+        $variants = collect($payload['variants'] ?? []);
+        $variantAttributeDefinitions = collect($payload['variant_attribute_definitions'] ?? []);
+        unset($payload['variant_attribute_definitions']);
+        unset($payload['variants']);
         unset($payload['kit_items']);
         unset($payload['modifier_groups']);
         unset($payload['image_file']);
         $payload['company_id'] = CompanyRules::currentCompanyId();
+        $createsVariantTemplate = ($payload['product_type'] ?? null) === Product::TYPE_VARIANT
+            && empty($payload['parent_product_id']);
         $payload['uses_component_groups'] = ($payload['product_type'] ?? null) === Product::TYPE_KIT
             && (bool) ($payload['uses_component_groups'] ?? false);
 
-        if (($payload['product_type'] ?? Product::TYPE_SIMPLE) !== Product::TYPE_VARIANT) {
+        if ($createsVariantTemplate) {
+            $payload['product_type'] = Product::TYPE_SIMPLE;
+            $payload['parent_product_id'] = null;
+        } elseif (($payload['product_type'] ?? Product::TYPE_SIMPLE) !== Product::TYPE_VARIANT) {
             $payload['parent_product_id'] = null;
         }
 
@@ -87,13 +102,17 @@ class ProductController extends Controller
             }
         }
 
-        DB::transaction(function () use ($payload, $kitItems, $modifierGroups): void {
+        DB::transaction(function () use ($payload, $kitItems, $modifierGroups, $variants, $variantAttributeDefinitions, $createsVariantTemplate): void {
             $product = Product::query()->create($payload);
             $this->syncKitItems($product, $product->uses_component_groups ? collect() : $kitItems);
             if ($product->uses_component_groups) {
                 $this->syncModifierGroups($product, $modifierGroups);
             } elseif ($product->product_type === Product::TYPE_KIT) {
                 $this->syncModifierGroups($product, collect());
+            }
+            if ($createsVariantTemplate) {
+                $this->syncVariantAttributeCatalog($variantAttributeDefinitions);
+                $this->syncVariants($product, $variants);
             }
         });
         $this->bumpStorefrontProductsCacheVersion();
@@ -103,7 +122,7 @@ class ProductController extends Controller
 
     public function edit(Product $product)
     {
-        $product->load(['kitItems', 'modifierGroups.options']);
+        $product->load(['kitItems', 'modifierGroups.options', 'variants']);
 
         $companyId = (int) ($product->company_id ?? CompanyRules::currentCompanyId());
         $categories = Category::query()
@@ -126,8 +145,13 @@ class ProductController extends Controller
             ->whereKeyNot($product->id)
             ->orderBy('name')
             ->get(['id', 'name', 'sku', 'barcode', 'unit']);
+        $variantAttributes = ProductVariantAttribute::query()
+            ->forCompany($companyId)
+            ->with(['values' => fn ($query) => $query->orderBy('value')])
+            ->orderBy('name')
+            ->get();
 
-        return view('products.edit', compact('product', 'categories', 'taxes', 'parentCandidates', 'kitComponentCandidates'));
+        return view('products.edit', compact('product', 'categories', 'taxes', 'parentCandidates', 'kitComponentCandidates', 'variantAttributes'));
     }
 
     public function update(ProductRequest $request, Product $product, ImageStorageService $imageStorage)
@@ -135,13 +159,22 @@ class ProductController extends Controller
         $payload = $request->validated();
         $kitItems = collect($payload['kit_items'] ?? []);
         $modifierGroups = collect($payload['modifier_groups'] ?? []);
+        $variants = collect($payload['variants'] ?? []);
+        $variantAttributeDefinitions = collect($payload['variant_attribute_definitions'] ?? []);
+        unset($payload['variant_attribute_definitions']);
+        unset($payload['variants']);
         unset($payload['kit_items']);
         unset($payload['modifier_groups']);
         unset($payload['image_file']);
+        $createsVariantTemplate = ($payload['product_type'] ?? null) === Product::TYPE_VARIANT
+            && empty($payload['parent_product_id']);
         $payload['uses_component_groups'] = ($payload['product_type'] ?? null) === Product::TYPE_KIT
             && (bool) ($payload['uses_component_groups'] ?? false);
 
-        if (($payload['product_type'] ?? Product::TYPE_SIMPLE) !== Product::TYPE_VARIANT) {
+        if ($createsVariantTemplate) {
+            $payload['product_type'] = Product::TYPE_SIMPLE;
+            $payload['parent_product_id'] = null;
+        } elseif (($payload['product_type'] ?? Product::TYPE_SIMPLE) !== Product::TYPE_VARIANT) {
             $payload['parent_product_id'] = null;
         }
 
@@ -156,13 +189,17 @@ class ProductController extends Controller
             }
         }
 
-        DB::transaction(function () use ($product, $payload, $kitItems, $modifierGroups): void {
+        DB::transaction(function () use ($product, $payload, $kitItems, $modifierGroups, $variants, $variantAttributeDefinitions, $createsVariantTemplate): void {
             $product->update($payload);
             $this->syncKitItems($product, $product->uses_component_groups ? collect() : $kitItems);
             if ($product->uses_component_groups) {
                 $this->syncModifierGroups($product, $modifierGroups);
             } elseif ($product->product_type === Product::TYPE_KIT) {
                 $this->syncModifierGroups($product, collect());
+            }
+            if ($createsVariantTemplate) {
+                $this->syncVariantAttributeCatalog($variantAttributeDefinitions);
+                $this->syncVariants($product, $variants);
             }
         });
         $this->bumpStorefrontProductsCacheVersion();
@@ -176,6 +213,42 @@ class ProductController extends Controller
         $this->bumpStorefrontProductsCacheVersion();
 
         return redirect()->route('products.index')->with('status', 'Producto eliminado.');
+    }
+
+    public function storeVariantAttribute(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'values' => ['required', 'array', 'min:1'],
+            'values.*' => ['required', 'string', 'max:120'],
+        ]);
+
+        $companyId = CompanyRules::currentCompanyId();
+        $name = trim((string) $validated['name']);
+        $values = collect($validated['values'])
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique(fn ($value) => mb_strtolower($value))
+            ->values();
+
+        $attribute = DB::transaction(function () use ($companyId, $name, $values): ProductVariantAttribute {
+            $attribute = ProductVariantAttribute::query()->firstOrCreate([
+                'company_id' => $companyId,
+                'name' => $name,
+            ]);
+
+            $values->each(function (string $value) use ($attribute): void {
+                $attribute->values()->firstOrCreate(['value' => $value]);
+            });
+
+            return $attribute->load(['values' => fn ($query) => $query->orderBy('value')]);
+        });
+
+        return response()->json([
+            'id' => $attribute->id,
+            'name' => $attribute->name,
+            'values' => $attribute->values->pluck('value')->values(),
+        ]);
     }
 
     protected function syncKitItems(Product $product, Collection $kitItems): void
@@ -280,6 +353,95 @@ class ProductController extends Controller
         }
 
         $product->modifierGroups()->whereNotIn('id', $existingGroupIds ?: [0])->delete();
+    }
+
+    protected function syncVariants(Product $product, Collection $variants): void
+    {
+        $normalized = $variants
+            ->filter(fn (array $variant): bool => filled($variant['sku'] ?? null) || filled($variant['name'] ?? null) || collect($variant['attributes'] ?? [])->filter()->isNotEmpty())
+            ->values();
+
+        $existingIds = [];
+
+        foreach ($normalized as $variant) {
+            $attributes = collect($variant['attributes'] ?? [])
+                ->mapWithKeys(fn ($value, $key) => [
+                    trim((string) $key) => trim((string) $value),
+                ])
+                ->filter(fn ($value, $key) => $key !== '' && $value !== '')
+                ->all();
+
+            $child = $product->variants()->updateOrCreate(
+                ['id' => $variant['id'] ?? null],
+                [
+                    'company_id' => $product->company_id,
+                    'category_id' => $product->category_id,
+                    'tax_id' => $product->tax_id,
+                    'name' => $this->variantName($product, $variant, $attributes),
+                    'sku' => $variant['sku'],
+                    'barcode' => $variant['barcode'] ?? null,
+                    'image_url' => $product->image_url,
+                    'description' => $product->description,
+                    'delivery_instructions' => $product->delivery_instructions,
+                    'unit' => $variant['unit'] ?? $product->unit,
+                    'product_type' => Product::TYPE_VARIANT,
+                    'uses_component_groups' => false,
+                    'variant_attributes' => $attributes,
+                    'cost_price' => (float) ($variant['cost_price'] ?? $product->cost_price),
+                    'sale_price' => (float) ($variant['sale_price'] ?? $product->sale_price),
+                    'is_active' => (bool) ($variant['is_active'] ?? true),
+                    'is_visible_ecommerce' => (bool) ($variant['is_visible_ecommerce'] ?? $product->is_visible_ecommerce),
+                ]
+            );
+
+            $existingIds[] = $child->id;
+        }
+
+        if ($existingIds !== []) {
+            $product->variants()->whereNotIn('id', $existingIds)->update(['is_active' => false]);
+        }
+    }
+
+    protected function syncVariantAttributeCatalog(Collection $definitions): void
+    {
+        $companyId = CompanyRules::currentCompanyId();
+
+        $definitions
+            ->map(function (array $definition): array {
+                return [
+                    'name' => trim((string) ($definition['name'] ?? '')),
+                    'values' => collect($definition['values'] ?? [])
+                        ->map(fn ($value) => trim((string) $value))
+                        ->filter()
+                        ->unique(fn ($value) => mb_strtolower($value))
+                        ->values(),
+                ];
+            })
+            ->filter(fn (array $definition): bool => $definition['name'] !== '' && $definition['values']->isNotEmpty())
+            ->each(function (array $definition) use ($companyId): void {
+                $attribute = ProductVariantAttribute::query()->firstOrCreate([
+                    'company_id' => $companyId,
+                    'name' => $definition['name'],
+                ]);
+
+                $definition['values']->each(function (string $value) use ($attribute): void {
+                    $attribute->values()->firstOrCreate(['value' => $value]);
+                });
+            });
+    }
+
+    private function variantName(Product $product, array $variant, array $attributes): string
+    {
+        if (filled($variant['name'] ?? null)) {
+            return trim((string) $variant['name']);
+        }
+
+        $parts = [];
+        foreach ($attributes as $attribute => $value) {
+            $parts[] = mb_strtolower((string) $attribute).' '.$value;
+        }
+
+        return trim($product->name.' - '.implode(' - ', $parts));
     }
 
     private function bumpStorefrontProductsCacheVersion(): void

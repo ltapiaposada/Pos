@@ -1,6 +1,7 @@
 @csrf
 @php
-    $selectedType = old('product_type', $product->product_type ?? \App\Models\Product::TYPE_SIMPLE);
+    $hasVariantChildren = $product->exists && $product->relationLoaded('variants') && $product->variants->isNotEmpty();
+    $selectedType = old('product_type', $hasVariantChildren ? \App\Models\Product::TYPE_VARIANT : ($product->product_type ?? \App\Models\Product::TYPE_SIMPLE));
     $rawKitItems = old(
         'kit_items',
         ($product->exists ? $product->kitItems->map(fn ($item) => [
@@ -38,6 +39,61 @@
     );
     $modifierGroups = collect($rawModifierGroups)
         ->filter(fn ($group) => ! empty($group['name']) || ! empty($group['options']))
+        ->values()
+        ->all();
+    $rawVariants = old(
+        'variants',
+        ($hasVariantChildren ? $product->variants->map(fn ($variant) => [
+            'id' => $variant->id,
+            'name' => $variant->name,
+            'attributes' => $variant->variant_attributes ?? [],
+            'sku' => $variant->sku,
+            'barcode' => $variant->barcode,
+            'unit' => $variant->unit,
+            'cost_price' => $variant->cost_price,
+            'sale_price' => $variant->sale_price,
+            'is_active' => $variant->is_active,
+            'is_visible_ecommerce' => $variant->is_visible_ecommerce,
+        ])->toArray() : [])
+    );
+    $variants = collect($rawVariants)
+        ->filter(fn ($variant) => ! empty($variant['name']) || ! empty($variant['sku']) || collect($variant['attributes'] ?? [])->filter()->isNotEmpty())
+        ->values()
+        ->all();
+    $variantCatalogOptions = collect($variantAttributes ?? [])
+        ->map(fn ($attribute) => [
+            'id' => $attribute->id,
+            'name' => $attribute->name,
+            'values' => $attribute->values->pluck('value')->values()->all(),
+        ])
+        ->values()
+        ->all();
+    $rawVariantAttributeDefinitions = old('variant_attribute_definitions');
+    if ($rawVariantAttributeDefinitions === null) {
+        $rawVariantAttributeDefinitions = collect($variants)
+            ->flatMap(fn ($variant) => collect($variant['attributes'] ?? [])->map(fn ($value, $name) => [
+                'name' => $name,
+                'value' => $value,
+            ]))
+            ->groupBy('name')
+            ->map(fn ($items, $name) => [
+                'name' => $name,
+                'values' => $items->pluck('value')->filter()->unique()->values()->all(),
+            ])
+            ->values()
+            ->all();
+    }
+    $variantAttributeDefinitions = collect($rawVariantAttributeDefinitions)
+        ->map(fn ($attribute) => [
+            'name' => trim((string) ($attribute['name'] ?? '')),
+            'values' => collect($attribute['values'] ?? [])
+                ->map(fn ($value) => trim((string) $value))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all(),
+        ])
+        ->filter(fn ($attribute) => $attribute['name'] !== '' && ! empty($attribute['values']))
         ->values()
         ->all();
     $currentImage = old('image_url', $product->image_url ?? null);
@@ -233,19 +289,51 @@
             <p class="text-xs text-error mt-1">{{ $message }}</p>
         @enderror
     </div>
-    <div id="variant-fields">
-        <label class="field-label">Producto base (solo variantes)</label>
-        <select name="parent_product_id" class="select select-bordered w-full">
-            <option value="">Selecciona un producto base</option>
-            @foreach ($parentCandidates as $candidate)
-                <option value="{{ $candidate->id }}" @selected((string) old('parent_product_id', $product->parent_product_id ?? '') === (string) $candidate->id)>
-                    {{ $candidate->name }} ({{ $candidate->sku }})
-                </option>
-            @endforeach
-        </select>
-        @error('parent_product_id')
-            <p class="text-xs text-error mt-1">{{ $message }}</p>
-        @enderror
+    <div id="variant-fields" class="sm:col-span-2 hidden" data-attribute-store-url="{{ route('products.variant-attributes.store') }}">
+        <div class="rounded-xl border border-base-300 bg-base-100 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-sm font-semibold">Variantes del producto</h3>
+                    <p class="mt-1 text-xs text-base-content/60">Agrega atributos y valores. La tabla se genera combinando los valores seleccionados.</p>
+                </div>
+                <button type="button" class="btn btn-outline btn-xs" id="open-create-variant-attribute">Crear atributo</button>
+            </div>
+            <div class="mt-3 max-w-md">
+                <label class="field-label">Atributo existente</label>
+                <select id="variant-attribute-select" class="select select-bordered w-full">
+                    <option value="">Selecciona atributo</option>
+                    @foreach ($variantCatalogOptions as $attribute)
+                        <option value="{{ $attribute['id'] }}">{{ $attribute['name'] }}</option>
+                    @endforeach
+                </select>
+                <button type="button" class="btn btn-outline btn-sm mt-2" id="add-variant-attribute">Agregar</button>
+            </div>
+            <div id="variant-attributes-wrapper" class="mt-3 space-y-3"></div>
+            <div class="mt-4 overflow-x-auto">
+                <table class="table table-zebra w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th>SKU variante</th>
+                            <th>Nombre generado</th>
+                            <th>Codigo de barras</th>
+                            <th>Costo</th>
+                            <th>Precio</th>
+                            <th>Activa</th>
+                            <th>E-commerce</th>
+                            <th>Accion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="variant-rows-wrapper"></tbody>
+                </table>
+            </div>
+            <p id="variant-validation-error" class="mt-2 hidden text-xs text-error"></p>
+            @error('variants')
+                <p class="mt-2 text-xs text-error">{{ $message }}</p>
+            @enderror
+            @if ($errors->has('variants.*'))
+                <p class="mt-2 text-xs text-error">{{ $errors->first('variants.*') }}</p>
+            @endif
+        </div>
     </div>
     <div>
         <label class="field-label">Costo</label>
@@ -326,6 +414,34 @@
     </div>
 </div>
 
+<div id="variant-attribute-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="w-full max-w-lg rounded-xl bg-base-100 p-4 shadow-xl">
+        <div class="mb-3 flex items-start justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold">Crear atributo</h2>
+                <p class="text-xs text-base-content/60">Define el atributo y los valores que podras combinar en la tabla.</p>
+            </div>
+            <button id="close-variant-attribute-modal" type="button" class="btn btn-outline btn-sm">Cerrar</button>
+        </div>
+        <div>
+            <label class="field-label">Nombre del atributo</label>
+            <input id="variant-attribute-name" type="text" class="input input-bordered w-full" placeholder="Talla, Color, Tela">
+        </div>
+        <div class="mt-3">
+            <div class="flex items-center justify-between gap-3">
+                <label class="field-label mb-0">Valores</label>
+                <button id="add-variant-attribute-value" type="button" class="btn btn-outline btn-xs">Agregar valor</button>
+            </div>
+            <div id="variant-attribute-values-wrapper" class="mt-2 space-y-2"></div>
+        </div>
+        <p id="variant-attribute-modal-error" class="mt-2 hidden text-xs text-error"></p>
+        <div class="mt-4 flex justify-end gap-2">
+            <button id="cancel-variant-attribute-modal" type="button" class="btn btn-outline btn-sm">Cancelar</button>
+            <button id="save-variant-attribute" type="button" class="btn btn-primary btn-sm">Guardar atributo</button>
+        </div>
+    </div>
+</div>
+
 <div id="kit-mode-fields" class="mt-6 hidden">
     <label class="field-label">¿El kit maneja grupos de componentes?</label>
     <select id="uses_component_groups" name="uses_component_groups" class="select select-bordered w-full max-w-md">
@@ -364,6 +480,7 @@
         <button type="button" class="btn btn-outline btn-xs" id="add-modifier-group">Agregar grupo</button>
     </div>
     <div id="modifier-groups-wrapper" class="mt-3 space-y-4"></div>
+    <p id="modifier-validation-error" class="mt-2 hidden text-xs text-error"></p>
     @error('modifier_groups')
         <p class="mt-2 text-xs text-error">{{ $message }}</p>
     @enderror
@@ -373,6 +490,60 @@
     <button class="btn btn-primary">Guardar</button>
     <a href="{{ route('products.index') }}" class="btn btn-outline">Cancelar</a>
 </div>
+
+<template id="variant-attribute-template">
+    <div class="rounded-xl border border-base-200 p-3 variant-attribute-row">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+                <div class="text-sm font-semibold variant-attribute-name-display"></div>
+                <div class="mt-2 flex flex-wrap gap-1 variant-attribute-values-display"></div>
+                <div class="variant-attribute-definition-inputs"></div>
+                <input type="hidden" class="variant-attribute-name">
+                <input type="hidden" class="variant-attribute-values">
+            </div>
+            <button type="button" class="btn btn-outline-danger btn-xs remove-variant-attribute">Quitar</button>
+        </div>
+    </div>
+</template>
+
+<template id="variant-row-template">
+    <tr class="variant-row">
+        <td>
+            <input type="hidden" class="variant-id-input">
+            <input type="hidden" class="variant-name-input">
+            <input type="hidden" class="variant-unit-input">
+            <input type="text" class="input input-bordered input-sm w-32 variant-sku-input">
+        </td>
+        <td>
+            <div class="min-w-56 text-sm font-medium variant-name-preview"></div>
+            <div class="mt-1 text-[11px] text-base-content/60 variant-attributes-preview"></div>
+        </td>
+        <td>
+            <input type="text" class="input input-bordered input-sm w-36 variant-barcode-input">
+        </td>
+        <td>
+            <input type="number" min="0" step="0.01" class="input input-bordered input-sm w-28 variant-cost-input">
+        </td>
+        <td>
+            <input type="number" min="0" step="0.01" class="input input-bordered input-sm w-28 variant-price-input">
+        </td>
+        <td>
+            <select class="select select-bordered select-sm w-24 variant-active-input">
+                <option value="1">Si</option>
+                <option value="0">No</option>
+            </select>
+        </td>
+        <td>
+            <select class="select select-bordered select-sm w-24 variant-visible-input">
+                <option value="1">Si</option>
+                <option value="0">No</option>
+            </select>
+        </td>
+        <td>
+            <button type="button" class="btn btn-outline-danger btn-xs remove-variant-row">Quitar</button>
+        </td>
+    </tr>
+</template>
 
 <template id="kit-item-template">
     <div class="grid grid-cols-1 gap-2 items-end sm:grid-cols-12 kit-item-row">
@@ -533,7 +704,31 @@
         const addModifierGroupBtn = document.getElementById('add-modifier-group');
         const modifierGroupTemplate = document.getElementById('modifier-group-template');
         const modifierOptionTemplate = document.getElementById('modifier-option-template');
+        const modifierValidationError = document.getElementById('modifier-validation-error');
         const initialModifierGroups = @json($modifierGroups);
+        const variantAttributesWrapper = document.getElementById('variant-attributes-wrapper');
+        const addVariantAttributeBtn = document.getElementById('add-variant-attribute');
+        const openCreateVariantAttributeBtn = document.getElementById('open-create-variant-attribute');
+        const variantAttributeSelect = document.getElementById('variant-attribute-select');
+        const variantAttributeModal = document.getElementById('variant-attribute-modal');
+        const closeVariantAttributeModalBtn = document.getElementById('close-variant-attribute-modal');
+        const cancelVariantAttributeModalBtn = document.getElementById('cancel-variant-attribute-modal');
+        const saveVariantAttributeBtn = document.getElementById('save-variant-attribute');
+        const addVariantAttributeValueBtn = document.getElementById('add-variant-attribute-value');
+        const variantAttributeNameInput = document.getElementById('variant-attribute-name');
+        const variantAttributeValuesWrapper = document.getElementById('variant-attribute-values-wrapper');
+        const variantAttributeModalError = document.getElementById('variant-attribute-modal-error');
+        const variantAttributeTemplate = document.getElementById('variant-attribute-template');
+        const variantRowsWrapper = document.getElementById('variant-rows-wrapper');
+        const variantRowTemplate = document.getElementById('variant-row-template');
+        const variantValidationError = document.getElementById('variant-validation-error');
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const variantAttributeStoreUrl = variantFields?.dataset.attributeStoreUrl || '';
+        const initialVariants = @json($variants);
+        const initialVariantAttributeDefinitions = @json($variantAttributeDefinitions);
+        let variantAttributeCatalog = @json($variantCatalogOptions);
+        let variantStateByKey = new Map();
+        let removedVariantKeys = new Set();
         const gramsPerUnit = {
             g: 1,
             kg: 1000,
@@ -578,6 +773,406 @@
             }
         }
 
+        function updateVariantInputNames() {
+            if (! variantRowsWrapper) {
+                return;
+            }
+
+            const isVariantTemplate = typeSelect.value === '{{ \App\Models\Product::TYPE_VARIANT }}';
+            variantRowsWrapper.querySelectorAll('.variant-row').forEach((row, index) => {
+                row.querySelector('.variant-id-input').name = isVariantTemplate ? `variants[${index}][id]` : '';
+                row.querySelector('.variant-name-input').name = isVariantTemplate ? `variants[${index}][name]` : '';
+                row.querySelector('.variant-sku-input').name = isVariantTemplate ? `variants[${index}][sku]` : '';
+                row.querySelector('.variant-barcode-input').name = isVariantTemplate ? `variants[${index}][barcode]` : '';
+                row.querySelector('.variant-cost-input').name = isVariantTemplate ? `variants[${index}][cost_price]` : '';
+                row.querySelector('.variant-price-input').name = isVariantTemplate ? `variants[${index}][sale_price]` : '';
+                row.querySelector('.variant-unit-input').name = isVariantTemplate ? `variants[${index}][unit]` : '';
+                row.querySelector('.variant-active-input').name = isVariantTemplate ? `variants[${index}][is_active]` : '';
+                row.querySelector('.variant-visible-input').name = isVariantTemplate ? `variants[${index}][is_visible_ecommerce]` : '';
+
+                const attributes = row._variantAttributes || {};
+                row.querySelectorAll('.variant-attribute-hidden').forEach(input => input.remove());
+                Object.entries(attributes).forEach(([attribute, value]) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.className = 'variant-attribute-hidden';
+                    input.name = isVariantTemplate ? `variants[${index}][attributes][${attribute}]` : '';
+                    input.value = value;
+                    row.appendChild(input);
+                });
+            });
+        }
+
+        function normalizeVariantAttributes(attributes) {
+            return Object.fromEntries(
+                Object.entries(attributes || {})
+                    .map(([attribute, value]) => [String(attribute).trim(), String(value).trim()])
+                    .filter(([attribute, value]) => attribute !== '' && value !== '')
+            );
+        }
+
+        function variantKey(attributes) {
+            return Object.entries(normalizeVariantAttributes(attributes))
+                .map(([attribute, value]) => `${attribute}:${value}`)
+                .join('|');
+        }
+
+        function variantNameFromAttributes(attributes) {
+            const productName = document.querySelector('[name="name"]')?.value.trim() || 'Producto';
+            const parts = Object.entries(normalizeVariantAttributes(attributes))
+                .map(([attribute, value]) => `${attribute.toLowerCase()} ${value}`);
+
+            return [productName, ...parts].join(' ');
+        }
+
+        function readVariantStateFromRow(row) {
+            const key = row.dataset.variantKey || variantKey(row._variantAttributes || {});
+            if (! key) {
+                return;
+            }
+
+            variantStateByKey.set(key, {
+                id: row.querySelector('.variant-id-input').value,
+                sku: row.querySelector('.variant-sku-input').value,
+                barcode: row.querySelector('.variant-barcode-input').value,
+                cost_price: row.querySelector('.variant-cost-input').value,
+                sale_price: row.querySelector('.variant-price-input').value,
+                unit: row.querySelector('.variant-unit-input').value,
+                is_active: row.querySelector('.variant-active-input').value,
+                is_visible_ecommerce: row.querySelector('.variant-visible-input').value,
+                name: row.querySelector('.variant-name-input').value,
+                attributes: row._variantAttributes || {},
+            });
+        }
+
+        function readCurrentVariantState() {
+            variantRowsWrapper?.querySelectorAll('.variant-row').forEach(readVariantStateFromRow);
+        }
+
+        function selectedVariantAttributes() {
+            if (! variantAttributesWrapper) {
+                return [];
+            }
+
+            return Array.from(variantAttributesWrapper.querySelectorAll('.variant-attribute-row'))
+                .map(row => ({
+                    name: row.querySelector('.variant-attribute-name').value.trim(),
+                    values: JSON.parse(row.querySelector('.variant-attribute-values').value || '[]'),
+                }))
+                .filter(attribute => attribute.name !== '' && attribute.values.length > 0);
+        }
+
+        function combinationsForAttributes(attributes) {
+            if (attributes.length === 0) {
+                return [];
+            }
+
+            return attributes.reduce((combinations, attribute) => {
+                const next = [];
+                combinations.forEach(combination => {
+                    attribute.values.forEach(value => {
+                        next.push({ ...combination, [attribute.name]: value });
+                    });
+                });
+                return next;
+            }, [{}]);
+        }
+
+        function nextVariantSku(index) {
+            const parentSku = document.querySelector('[name="sku"]')?.value.trim() || 'VAR';
+            return `${parentSku}-${index + 1}`;
+        }
+
+        function updateVariantAttributeDefinitionNames() {
+            if (! variantAttributesWrapper) {
+                return;
+            }
+
+            const isVariantTemplate = typeSelect.value === '{{ \App\Models\Product::TYPE_VARIANT }}';
+            variantAttributesWrapper.querySelectorAll('.variant-attribute-row').forEach((row, index) => {
+                const inputsWrapper = row.querySelector('.variant-attribute-definition-inputs');
+                const name = row.querySelector('.variant-attribute-name').value.trim();
+                const values = JSON.parse(row.querySelector('.variant-attribute-values').value || '[]');
+                inputsWrapper.innerHTML = '';
+
+                const nameInput = document.createElement('input');
+                nameInput.type = 'hidden';
+                nameInput.name = isVariantTemplate ? `variant_attribute_definitions[${index}][name]` : '';
+                nameInput.value = name;
+                inputsWrapper.appendChild(nameInput);
+
+                values.forEach((value, valueIndex) => {
+                    const valueInput = document.createElement('input');
+                    valueInput.type = 'hidden';
+                    valueInput.name = isVariantTemplate ? `variant_attribute_definitions[${index}][values][${valueIndex}]` : '';
+                    valueInput.value = value;
+                    inputsWrapper.appendChild(valueInput);
+                });
+            });
+        }
+
+        function createVariantAttributeRow(attribute = null) {
+            if (! variantAttributesWrapper || ! variantAttributeTemplate) {
+                return;
+            }
+
+            const name = String(attribute?.name || '').trim();
+            const values = Array.from(new Set((Array.isArray(attribute?.values) ? attribute.values : [])
+                .map(value => String(value).trim())
+                .filter(Boolean)));
+            if (name === '' || values.length === 0) {
+                return;
+            }
+            const existingNames = selectedVariantAttributes().map(item => item.name.toLowerCase());
+            if (existingNames.includes(name.toLowerCase())) {
+                if (variantValidationError) {
+                    variantValidationError.textContent = 'Ese atributo ya fue agregado.';
+                    variantValidationError.classList.remove('hidden');
+                }
+                return;
+            }
+
+            const row = variantAttributeTemplate.content.firstElementChild.cloneNode(true);
+            row.querySelector('.variant-attribute-name').value = name;
+            row.querySelector('.variant-attribute-values').value = JSON.stringify(values);
+            row.querySelector('.variant-attribute-name-display').textContent = name;
+            row.querySelector('.variant-attribute-values-display').innerHTML = '';
+            values.forEach(value => {
+                const chip = document.createElement('span');
+                chip.className = 'badge badge-outline';
+                chip.textContent = value;
+                row.querySelector('.variant-attribute-values-display').appendChild(chip);
+            });
+            row.querySelector('.remove-variant-attribute').addEventListener('click', function () {
+                readCurrentVariantState();
+                row.remove();
+                renderVariantRows();
+            });
+
+            variantAttributesWrapper.appendChild(row);
+            renderVariantRows();
+        }
+
+        function createModalValueRow(value = '') {
+            if (! variantAttributeValuesWrapper) {
+                return;
+            }
+
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-2 variant-attribute-value-row';
+            row.innerHTML = `
+                <input type="text" class="input input-bordered input-sm w-full variant-attribute-value-input" placeholder="L, M, S">
+                <button type="button" class="btn btn-outline-danger btn-xs remove-variant-attribute-value">Quitar</button>
+            `;
+            row.querySelector('.variant-attribute-value-input').value = value;
+            row.querySelector('.remove-variant-attribute-value').addEventListener('click', function () {
+                row.remove();
+                if (variantAttributeValuesWrapper.querySelectorAll('.variant-attribute-value-row').length === 0) {
+                    createModalValueRow();
+                }
+            });
+            variantAttributeValuesWrapper.appendChild(row);
+        }
+
+        function resetVariantAttributeModal() {
+            if (! variantAttributeNameInput || ! variantAttributeValuesWrapper) {
+                return;
+            }
+
+            variantAttributeNameInput.value = '';
+            variantAttributeValuesWrapper.innerHTML = '';
+            createModalValueRow();
+            if (variantAttributeModalError) {
+                variantAttributeModalError.textContent = '';
+                variantAttributeModalError.classList.add('hidden');
+            }
+        }
+
+        function openVariantAttributeModal() {
+            if (! variantAttributeModal) {
+                return;
+            }
+
+            resetVariantAttributeModal();
+            variantAttributeModal.classList.remove('hidden');
+            variantAttributeModal.classList.add('flex');
+            variantAttributeNameInput?.focus();
+        }
+
+        function closeVariantAttributeModal() {
+            if (! variantAttributeModal) {
+                return;
+            }
+
+            variantAttributeModal.classList.add('hidden');
+            variantAttributeModal.classList.remove('flex');
+        }
+
+        function readModalAttribute() {
+            const name = variantAttributeNameInput?.value.trim() || '';
+            const values = Array.from(variantAttributeValuesWrapper?.querySelectorAll('.variant-attribute-value-input') || [])
+                .map(input => input.value.trim())
+                .filter(Boolean)
+                .filter((value, index, list) => list.findIndex(item => item.toLowerCase() === value.toLowerCase()) === index);
+
+            return { name, values };
+        }
+
+        function showVariantAttributeModalError(message) {
+            if (! variantAttributeModalError) {
+                return;
+            }
+
+            variantAttributeModalError.textContent = message;
+            variantAttributeModalError.classList.remove('hidden');
+        }
+
+        function addAttributeToSelect(attribute) {
+            if (! variantAttributeSelect) {
+                return;
+            }
+
+            const existing = variantAttributeCatalog.find(item => item.name.toLowerCase() === attribute.name.toLowerCase());
+            if (existing) {
+                existing.values = Array.from(new Set([...existing.values, ...attribute.values]));
+                return;
+            }
+
+            const catalogAttribute = {
+                id: `new-${Date.now()}`,
+                name: attribute.name,
+                values: attribute.values,
+            };
+            variantAttributeCatalog.push(catalogAttribute);
+
+            const option = document.createElement('option');
+            option.value = catalogAttribute.id;
+            option.textContent = catalogAttribute.name;
+            variantAttributeSelect.appendChild(option);
+        }
+
+        function selectedCatalogAttribute() {
+            if (! variantAttributeSelect || variantAttributeSelect.value === '') {
+                return null;
+            }
+
+            return variantAttributeCatalog.find(attribute => String(attribute.id) === String(variantAttributeSelect.value)) || null;
+        }
+
+        async function persistVariantAttribute(attribute) {
+            const response = await fetch(variantAttributeStoreUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify(attribute),
+            });
+
+            if (! response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                const errors = payload.errors || {};
+                const firstError = Object.values(errors).flat()[0] || payload.message || 'No se pudo guardar el atributo.';
+                throw new Error(firstError);
+            }
+
+            return response.json();
+        }
+
+        function renderVariantRows() {
+            if (! variantRowsWrapper || ! variantRowTemplate) {
+                return;
+            }
+
+            readCurrentVariantState();
+            const combinations = combinationsForAttributes(selectedVariantAttributes());
+            variantRowsWrapper.innerHTML = '';
+
+            combinations.forEach((attributes, index) => {
+                const key = variantKey(attributes);
+                if (removedVariantKeys.has(key)) {
+                    return;
+                }
+                const saved = variantStateByKey.get(key) || {};
+                const row = variantRowTemplate.content.firstElementChild.cloneNode(true);
+                const generatedName = saved.name || variantNameFromAttributes(attributes);
+                row.dataset.variantKey = key;
+                row._variantAttributes = attributes;
+
+                row.querySelector('.variant-id-input').value = saved.id ?? '';
+                row.querySelector('.variant-name-input').value = generatedName;
+                row.querySelector('.variant-name-preview').textContent = generatedName;
+                row.querySelector('.variant-attributes-preview').textContent = Object.entries(attributes)
+                    .map(([attribute, value]) => `${attribute}: ${value}`)
+                    .join(' | ');
+                row.querySelector('.variant-sku-input').value = saved.sku || nextVariantSku(index);
+                row.querySelector('.variant-barcode-input').value = saved.barcode ?? '';
+                row.querySelector('.variant-cost-input').value = saved.cost_price ?? document.querySelector('[name="cost_price"]')?.value ?? '0';
+                row.querySelector('.variant-price-input').value = saved.sale_price ?? document.querySelector('[name="sale_price"]')?.value ?? '0';
+                row.querySelector('.variant-unit-input').value = saved.unit ?? document.querySelector('[name="unit"]')?.value ?? 'unit';
+                row.querySelector('.variant-active-input').value = saved.is_active === '0' ? '0' : '1';
+                row.querySelector('.variant-visible-input').value = saved.is_visible_ecommerce === '0' ? '0' : '1';
+
+                row.querySelectorAll('input, select').forEach(input => {
+                    input.addEventListener('input', () => readVariantStateFromRow(row));
+                    input.addEventListener('change', () => readVariantStateFromRow(row));
+                });
+
+                row.querySelector('.remove-variant-row').addEventListener('click', function () {
+                    readVariantStateFromRow(row);
+                    removedVariantKeys.add(key);
+                    variantStateByKey.delete(key);
+                    row.remove();
+                    updateVariantInputNames();
+                });
+
+                variantRowsWrapper.appendChild(row);
+            });
+
+            updateVariantInputNames();
+            updateVariantAttributeDefinitionNames();
+        }
+
+        function initializeVariantGenerator() {
+            const attributesByName = {};
+            initialVariants.forEach(variant => {
+                const attributes = normalizeVariantAttributes(variant.attributes || {});
+                const key = variantKey(attributes);
+                if (key) {
+                    variantStateByKey.set(key, {
+                        id: variant.id ?? '',
+                        sku: variant.sku ?? '',
+                        barcode: variant.barcode ?? '',
+                        cost_price: variant.cost_price ?? '',
+                        sale_price: variant.sale_price ?? '',
+                        unit: variant.unit ?? 'unit',
+                        is_active: variant.is_active === false || String(variant.is_active) === '0' ? '0' : '1',
+                        is_visible_ecommerce: variant.is_visible_ecommerce === false || String(variant.is_visible_ecommerce) === '0' ? '0' : '1',
+                        name: variant.name ?? '',
+                        attributes,
+                    });
+                }
+
+                Object.entries(attributes).forEach(([attribute, value]) => {
+                    attributesByName[attribute] = attributesByName[attribute] || [];
+                    if (! attributesByName[attribute].includes(value)) {
+                        attributesByName[attribute].push(value);
+                    }
+                });
+            });
+
+            const attributesToPaint = initialVariantAttributeDefinitions.length
+                ? initialVariantAttributeDefinitions
+                : Object.entries(attributesByName).map(([name, values]) => ({ name, values }));
+
+            attributesToPaint.forEach(({ name, values }) => {
+                createVariantAttributeRow({ name, values });
+            });
+
+            renderVariantRows();
+        }
+
         function toggleSections() {
             const type = typeSelect.value;
             const isKit = type === '{{ \App\Models\Product::TYPE_KIT }}';
@@ -590,6 +1185,15 @@
             kitFields.classList.toggle('hidden', ! isKit || usesGroups);
             modifierFields.classList.toggle('hidden', ! usesGroups);
             digitalFields.classList.toggle('hidden', type !== '{{ \App\Models\Product::TYPE_DIGITAL }}');
+
+            if (isKit && ! usesGroups && wrapper.querySelectorAll('.kit-item-row').length === 0) {
+                createRow();
+            }
+            if (usesGroups && modifierGroupsWrapper.querySelectorAll('.modifier-group-row').length === 0) {
+                createModifierGroup();
+            }
+            updateVariantInputNames();
+            updateVariantAttributeDefinitionNames();
             updateInputNames();
             updateModifierInputNames();
         }
@@ -729,14 +1333,179 @@
             createRow();
         });
 
+        if (addVariantAttributeBtn) {
+            addVariantAttributeBtn.addEventListener('click', function () {
+                const attribute = selectedCatalogAttribute();
+                variantAttributeSelect?.setCustomValidity('');
+                if (! attribute) {
+                    variantAttributeSelect?.setCustomValidity('Selecciona atributo.');
+                    variantAttributeSelect?.reportValidity();
+                    return;
+                }
+
+                createVariantAttributeRow(attribute);
+                if (variantAttributeSelect) {
+                    variantAttributeSelect.value = '';
+                }
+            });
+        }
+
+        openCreateVariantAttributeBtn?.addEventListener('click', openVariantAttributeModal);
+        closeVariantAttributeModalBtn?.addEventListener('click', closeVariantAttributeModal);
+        cancelVariantAttributeModalBtn?.addEventListener('click', closeVariantAttributeModal);
+        addVariantAttributeValueBtn?.addEventListener('click', function () {
+            createModalValueRow();
+        });
+        saveVariantAttributeBtn?.addEventListener('click', async function () {
+            const attribute = readModalAttribute();
+            if (attribute.name === '') {
+                showVariantAttributeModalError('Escribe el nombre del atributo.');
+                variantAttributeNameInput?.focus();
+                return;
+            }
+            if (attribute.values.length === 0) {
+                showVariantAttributeModalError('Agrega al menos un valor para el atributo.');
+                variantAttributeValuesWrapper?.querySelector('.variant-attribute-value-input')?.focus();
+                return;
+            }
+
+            saveVariantAttributeBtn.disabled = true;
+            try {
+                const savedAttribute = await persistVariantAttribute(attribute);
+                addAttributeToSelect(savedAttribute);
+                createVariantAttributeRow(savedAttribute);
+                closeVariantAttributeModal();
+            } catch (error) {
+                showVariantAttributeModalError(error.message || 'No se pudo guardar el atributo.');
+            } finally {
+                saveVariantAttributeBtn.disabled = false;
+            }
+        });
+
         typeSelect.addEventListener('change', toggleSections);
         usesComponentGroupsSelect.addEventListener('change', toggleSections);
 
         typeSelect.closest('form').addEventListener('submit', event => {
-            if (
-                typeSelect.value !== '{{ \App\Models\Product::TYPE_KIT }}'
-                || usesComponentGroupsSelect.value === '1'
-            ) {
+            if (typeSelect.value === '{{ \App\Models\Product::TYPE_VARIANT }}') {
+                const rows = Array.from(variantRowsWrapper.querySelectorAll('.variant-row'));
+                let firstInvalidField = null;
+                let message = '';
+
+                rows.forEach(row => {
+                    const nameInput = row.querySelector('.variant-name-input');
+                    const skuInput = row.querySelector('.variant-sku-input');
+
+                    [nameInput, skuInput].forEach(input => input.setCustomValidity(''));
+
+                    if (skuInput.value.trim() === '' && firstInvalidField === null) {
+                        skuInput.setCustomValidity('Cada variante debe tener SKU.');
+                        firstInvalidField = skuInput;
+                        message = 'Cada variante debe tener SKU.';
+                    }
+                });
+
+                if (rows.length === 0 && firstInvalidField === null) {
+                    const firstAttributeInput = variantAttributeSelect;
+                    firstInvalidField = firstAttributeInput;
+                    if (firstInvalidField) {
+                        firstInvalidField.setCustomValidity('Agrega atributos y valores para generar variantes.');
+                    }
+                    message = 'Agrega atributos con valores para generar variantes.';
+                }
+
+                if (firstInvalidField) {
+                    event.preventDefault();
+                    if (variantValidationError) {
+                        variantValidationError.textContent = message;
+                        variantValidationError.classList.remove('hidden');
+                    }
+                    firstInvalidField.reportValidity();
+                    firstInvalidField.focus();
+                    return;
+                }
+
+                if (variantValidationError) {
+                    variantValidationError.textContent = '';
+                    variantValidationError.classList.add('hidden');
+                }
+                return;
+            }
+
+            if (typeSelect.value !== '{{ \App\Models\Product::TYPE_KIT }}') {
+                return;
+            }
+
+            if (usesComponentGroupsSelect.value === '1') {
+                const groupRows = Array.from(modifierGroupsWrapper.querySelectorAll('.modifier-group-row'));
+                let firstInvalidField = null;
+                let message = '';
+
+                groupRows.forEach(groupRow => {
+                    const nameInput = groupRow.querySelector('.modifier-group-name');
+                    const typeInput = groupRow.querySelector('.modifier-group-type');
+                    const optionRows = Array.from(groupRow.querySelectorAll('.modifier-option-row'));
+                    const validOptions = optionRows.filter(optionRow => {
+                        const productInput = optionRow.querySelector('.modifier-option-product');
+                        const labelInput = optionRow.querySelector('.modifier-option-label');
+                        return productInput.value !== '' || labelInput.value.trim() !== '';
+                    });
+
+                    nameInput.setCustomValidity('');
+                    optionRows.forEach(optionRow => {
+                        optionRow.querySelector('.modifier-option-product').setCustomValidity('');
+                        optionRow.querySelector('.modifier-option-label').setCustomValidity('');
+                        optionRow.querySelector('.modifier-option-quantity').setCustomValidity('');
+                    });
+
+                    if (nameInput.value.trim() === '' && firstInvalidField === null) {
+                        nameInput.setCustomValidity('Escribe el nombre del grupo.');
+                        firstInvalidField = nameInput;
+                        message = 'Cada grupo debe tener nombre.';
+                    }
+
+                    if (validOptions.length === 0 && firstInvalidField === null) {
+                        const labelInput = optionRows[0]?.querySelector('.modifier-option-label');
+                        if (labelInput) {
+                            labelInput.setCustomValidity('Agrega al menos una opcion al grupo.');
+                            firstInvalidField = labelInput;
+                            message = 'Cada grupo debe tener al menos una opcion.';
+                        }
+                    }
+
+                    if (['single', 'multiple'].includes(typeInput.value)) {
+                        validOptions.forEach(optionRow => {
+                            const productInput = optionRow.querySelector('.modifier-option-product');
+                            const quantityInput = optionRow.querySelector('.modifier-option-quantity');
+
+                            if (productInput.value === '' && firstInvalidField === null) {
+                                productInput.setCustomValidity('Selecciona el producto que se descuenta del inventario.');
+                                firstInvalidField = productInput;
+                                message = 'Las opciones de seleccion deben apuntar a un producto existente.';
+                            }
+                            if (parseFloat(quantityInput.value || '0') <= 0 && firstInvalidField === null) {
+                                quantityInput.setCustomValidity('Indica la cantidad consumida.');
+                                firstInvalidField = quantityInput;
+                                message = 'Indica la cantidad consumida por cada opcion.';
+                            }
+                        });
+                    }
+                });
+
+                if (firstInvalidField) {
+                    event.preventDefault();
+                    if (modifierValidationError) {
+                        modifierValidationError.textContent = message;
+                        modifierValidationError.classList.remove('hidden');
+                    }
+                    firstInvalidField.reportValidity();
+                    firstInvalidField.focus();
+                    return;
+                }
+
+                if (modifierValidationError) {
+                    modifierValidationError.textContent = '';
+                    modifierValidationError.classList.add('hidden');
+                }
                 return;
             }
 
@@ -761,6 +1530,8 @@
                 firstInvalidSearch.focus();
             }
         });
+
+        initializeVariantGenerator();
 
         if (initialItems.length > 0) {
             initialItems.forEach(item => createRow(item));

@@ -104,13 +104,22 @@ class PosController extends Controller
             'tax:id,rate',
             'kitItems.componentProduct',
             'modifierGroups.options.product',
+            'variants.tax:id,rate',
         ]);
         $search = trim((string) $request->query('q', ''));
         if ($search !== '') {
             $query->where(function ($builder) use ($search) {
                 $builder->where('sku', 'like', "%{$search}%")
                     ->orWhere('barcode', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%");
+                    ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhereHas('variants', function ($variantQuery) use ($search) {
+                        $variantQuery->where('is_active', true)
+                            ->where(function ($variantSearch) use ($search) {
+                                $variantSearch->where('sku', 'like', "%{$search}%")
+                                    ->orWhere('barcode', 'like', "%{$search}%")
+                                    ->orWhere('name', 'like', "%{$search}%");
+                            });
+                    });
             })->orderByRaw(
                 'CASE WHEN barcode = ? THEN 0 WHEN sku = ? THEN 1 ELSE 2 END',
                 [$search, $search]
@@ -118,25 +127,56 @@ class PosController extends Controller
         }
 
         $products = $query->orderBy('name')->limit(60)->get([
-            'id', 'name', 'sku', 'barcode', 'sale_price', 'tax_id', 'product_type', 'uses_component_groups',
+            'id', 'name', 'sku', 'barcode', 'sale_price', 'tax_id', 'product_type', 'uses_component_groups', 'parent_product_id', 'variant_attributes',
         ]);
+        $products = $products->whereNull('parent_product_id')->values();
+        $stockProducts = $products
+            ->flatMap(fn (Product $product) => $product->variants->isNotEmpty() ? $product->variants : [$product])
+            ->values();
 
-        $availableByProduct = app(InventoryService::class)->availableStockForProducts($products, $branchId);
+        $availableByProduct = app(InventoryService::class)->availableStockForProducts($stockProducts, $branchId);
 
         $products = $products->filter(function (Product $product) use ($availableByProduct) {
+            if ($product->variants->isNotEmpty()) {
+                return $product->variants
+                    ->where('is_active', true)
+                    ->contains(fn (Product $variant) => (float) ($availableByProduct[$variant->id] ?? 0) > 0);
+            }
+
             return (float) ($availableByProduct[$product->id] ?? 0) > 0;
         })->take(20)->map(function (Product $product) use ($availableByProduct) {
+            $variantOptions = $product->variants
+                ->where('is_active', true)
+                ->filter(fn (Product $variant) => (float) ($availableByProduct[$variant->id] ?? 0) > 0)
+                ->values();
+            $displayProduct = $variantOptions->first() ?? $product;
+
             return [
                 'id' => $product->id,
                 'name' => $product->name,
                 'sku' => $product->sku,
                 'barcode' => $product->barcode,
-                'sale_price' => (float) $product->sale_price,
-                'tax_rate' => (float) ($product->tax?->rate ?? 0),
-                'available_stock' => (float) ($availableByProduct[$product->id] ?? 0),
-                'tracks_inventory' => $product->tracksInventory(),
+                'sale_price' => (float) $displayProduct->sale_price,
+                'tax_rate' => (float) ($displayProduct->tax?->rate ?? $product->tax?->rate ?? 0),
+                'available_stock' => $variantOptions->isNotEmpty()
+                    ? (float) $variantOptions->sum(fn (Product $variant) => (float) ($availableByProduct[$variant->id] ?? 0))
+                    : (float) ($availableByProduct[$product->id] ?? 0),
+                'tracks_inventory' => $displayProduct->tracksInventory(),
                 'product_type' => $product->product_type,
                 'uses_component_groups' => $product->uses_component_groups,
+                'has_variants' => $variantOptions->isNotEmpty(),
+                'variants' => $variantOptions->map(fn (Product $variant) => [
+                    'id' => $variant->id,
+                    'name' => $variant->name,
+                    'sku' => $variant->sku,
+                    'barcode' => $variant->barcode,
+                    'sale_price' => (float) $variant->sale_price,
+                    'tax_rate' => (float) ($variant->tax?->rate ?? $product->tax?->rate ?? 0),
+                    'available_stock' => (float) ($availableByProduct[$variant->id] ?? 0),
+                    'tracks_inventory' => $variant->tracksInventory(),
+                    'product_type' => $variant->product_type,
+                    'attributes' => $variant->variant_attributes ?? [],
+                ])->values(),
                 'modifier_groups' => $product->modifierGroups->map(fn ($group) => [
                     'id' => $group->id,
                     'name' => $group->name,

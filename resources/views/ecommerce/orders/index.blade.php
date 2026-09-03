@@ -1,120 +1,24 @@
 @extends('ecommerce.layouts.app')
 
 @section('content')
-    <style>
-        .shop-mini-hero {
-            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #0ea5e9 100%);
-            border-radius: 1rem;
-            color: #fff;
-            padding: 1.4rem 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 14px 30px rgba(15, 23, 42, .18);
-        }
-        .orders-shell {
-            border: 1px solid #e2e8f0;
-            border-radius: 1rem;
-            background: #fff;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
-            overflow: hidden;
-        }
-    </style>
-
-    <section class="shop-mini-hero">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-                <h1 class="h4 mb-1 text-white">Mis pedidos</h1>
-                <p class="mb-0 text-white-50">Consulta el estado de validacion y entrega de tus pedidos.</p>
-            </div>
-            <a href="{{ route('shop.index') }}" class="btn btn-light btn-sm">Seguir comprando</a>
-        </div>
-    </section>
-
     @php
-        $statusLabels = [
-            'pending' => 'Recibido',
-            'processing' => 'Confirmado',
-            'shipped' => 'Despachado',
-            'delivered' => 'Entregado',
-            'cancelled' => 'Cancelado',
-        ];
-        $paymentLabels = [
-            'card' => 'Tarjeta',
-            'transfer' => 'Transferencia por validar',
-            'qr' => 'QR por validar',
-            'contraentrega' => 'Contraentrega',
-            'other' => 'Otro',
-            'cash' => 'Efectivo',
-            'credit' => 'Credito',
-        ];
-        $statusClasses = [
-            'pending' => 'text-bg-warning',
-            'processing' => 'text-bg-info',
-            'shipped' => 'text-bg-primary',
-            'delivered' => 'text-bg-success',
-            'cancelled' => 'text-bg-danger',
-        ];
+        $statusLabels = ['pending' => 'Recibido', 'processing' => 'Confirmado', 'shipped' => 'Despachado', 'delivered' => 'Entregado', 'cancelled' => 'Cancelado'];
+        $paymentLabels = ['card' => 'Tarjeta', 'transfer' => 'Transferencia por validar', 'qr' => 'QR por validar', 'contraentrega' => 'Contraentrega', 'other' => 'Otro', 'cash' => 'Efectivo', 'credit' => 'Credito'];
     @endphp
-
-    @if ($orders->isEmpty())
-        <div class="alert alert-secondary">Aun no tienes pedidos.</div>
-        <a href="{{ route('shop.index') }}" class="btn btn-primary">Ir a comprar</a>
-    @else
-        <div class="orders-shell">
-            <div class="d-md-none p-3">
+    <section class="shop-page">
+        <header class="shop-page-header"><div><div class="shop-page-header__eyebrow">Tu cuenta</div><h1>Mis pedidos</h1><p>Consulta el estado, el pago registrado y el detalle de cada compra.</p></div><a href="{{ route('shop.index') }}" class="shop-action shop-action--soft">Seguir comprando</a></header>
+        @if ($orders->isEmpty())
+            <section class="shop-surface"><h2>Aun no tienes pedidos</h2><p class="shop-note">Cuando finalices una compra podras consultar su estado aqui.</p><a href="{{ route('shop.index') }}" class="shop-action mt-3">Ir al catalogo</a></section>
+        @else
+            <section class="shop-order-list">
                 @foreach ($orders as $order)
-                    <article class="border rounded-3 p-3 mb-3">
-                        <div class="d-flex justify-content-between align-items-start gap-2">
-                            <div>
-                                <div class="fw-semibold">#{{ $order->sale_number }}</div>
-                                <div class="small text-muted">{{ $order->sold_at?->format('d/m/Y H:i') }}</div>
-                            </div>
-                            <span class="badge {{ $statusClasses[$order->status] ?? 'text-bg-secondary' }}">{{ $statusLabels[$order->status] ?? strtoupper($order->status) }}</span>
-                        </div>
-                        <div class="small mt-2">Pago: {{ $paymentLabels[$order->payments->first()?->method ?? ''] ?? 'Sin registrar' }}</div>
-                        @if ($order->status === 'pending')
-                            <div class="small text-muted mt-1">Estamos validando el pago o la modalidad de entrega antes de confirmarlo.</div>
-                        @endif
-                        <div class="d-flex justify-content-between align-items-center mt-2">
-                            <span>Total</span>
-                            <strong>${{ number_format((float) $order->total, 2) }}</strong>
-                        </div>
-                        <a href="{{ route('shop.orders.show', $order) }}" class="btn btn-outline-secondary btn-sm w-100 mt-3">Ver detalle</a>
+                    <article class="shop-order-card">
+                        <div><div class="shop-order-card__number">Pedido #{{ $order->sale_number }}</div><div class="shop-order-card__info">{{ $order->sold_at?->format('d/m/Y H:i') }} · {{ $paymentLabels[$order->payments->first()?->method ?? ''] ?? 'Sin registrar' }}</div>@if ($order->status === 'pending')<div class="shop-note">Estamos validando el pago o la modalidad de entrega.</div>@endif</div>
+                        <div class="d-flex flex-column align-items-md-end gap-2"><span class="shop-status shop-status--{{ $order->status }}">{{ $statusLabels[$order->status] ?? strtoupper($order->status) }}</span><strong>COP {{ number_format((float) $order->total, 2) }}</strong><a href="{{ route('shop.orders.show', $order) }}" class="shop-action shop-action--soft">Ver detalle</a></div>
                     </article>
                 @endforeach
-            </div>
-
-            <div class="table-responsive d-none d-md-block">
-                <table class="table align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Pedido</th>
-                            <th>Fecha</th>
-                            <th>Estado</th>
-                            <th>Pago</th>
-                            <th>Total</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($orders as $order)
-                            <tr>
-                                <td class="fw-semibold">#{{ $order->sale_number }}</td>
-                                <td>{{ $order->sold_at?->format('d/m/Y H:i') }}</td>
-                                <td><span class="badge {{ $statusClasses[$order->status] ?? 'text-bg-secondary' }}">{{ $statusLabels[$order->status] ?? strtoupper($order->status) }}</span></td>
-                                <td>{{ $paymentLabels[$order->payments->first()?->method ?? ''] ?? 'Sin registrar' }}</td>
-                                <td class="fw-semibold">${{ number_format((float) $order->total, 2) }}</td>
-                                <td>
-                                    <a href="{{ route('shop.orders.show', $order) }}" class="btn btn-outline-secondary btn-sm">Ver detalle</a>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="mt-3">
-            {{ $orders->links() }}
-        </div>
-    @endif
+            </section>
+            <div class="mt-4">{{ $orders->links() }}</div>
+        @endif
+    </section>
 @endsection

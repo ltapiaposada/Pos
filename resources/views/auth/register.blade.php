@@ -1,57 +1,12 @@
-<x-guest-layout>
-    <div class="mb-6">
-        <h1 class="text-xl font-semibold tracking-tight text-base-content">Crear cuenta</h1>
-        <p class="mt-1 text-sm text-base-content/60">Registra tu cuenta de cliente para comprar en la tienda.</p>
-    </div>
-
-    <form method="POST" action="{{ route('register') }}" class="space-y-4">
+<x-auth-shell title="Crea tu cuenta" subtitle="Registrate para comprar y consultar tus pedidos.">
+    <form method="POST" action="{{ route('register') }}">
         @csrf
-
-        <!-- Name -->
-        <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
-            <x-input-error :messages="$errors->get('name')" class="mt-2" />
-        </div>
-
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <!-- Password -->
-        <div>
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Confirm Password -->
-        <div>
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
-
-            <x-text-input id="password_confirmation" class="block mt-1 w-full"
-                            type="password"
-                            name="password_confirmation" required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end">
-            <a class="underline text-sm text-base-content/70 hover:text-base-content rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/40" href="{{ route('login') }}">
-                {{ __('Already registered?') }}
-            </a>
-
-            <x-primary-button class="ms-4">
-                {{ __('Register') }}
-            </x-primary-button>
-        </div>
+        <div class="auth-field"><label for="name">Nombre</label><div class="auth-input-wrap"><input id="name" type="text" name="name" value="{{ old('name') }}" placeholder="Tu nombre" required autofocus autocomplete="name"></div>@error('name') <div class="auth-error">{{ $message }}</div> @enderror</div>
+        <div class="auth-field"><label for="email">Correo electronico</label><div class="auth-input-wrap"><input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="tucorreo@ejemplo.com" required autocomplete="username"></div>@error('email') <div class="auth-error">{{ $message }}</div> @enderror</div>
+        <div class="auth-field"><label for="password">Contrasena</label><div class="auth-input-wrap"><input id="password" class="auth-password" type="password" name="password" placeholder="••••••••" required autocomplete="new-password"><button type="button" class="auth-toggle" data-auth-toggle="password" aria-label="Mostrar contrasena">Mostrar</button></div>@error('password') <div class="auth-error">{{ $message }}</div> @enderror</div>
+        <div class="auth-field"><label for="password_confirmation">Confirmar contrasena</label><div class="auth-input-wrap"><input id="password_confirmation" class="auth-password" type="password" name="password_confirmation" placeholder="••••••••" required autocomplete="new-password"><button type="button" class="auth-toggle" data-auth-toggle="password_confirmation" aria-label="Mostrar contrasena">Mostrar</button></div>@error('password_confirmation') <div class="auth-error">{{ $message }}</div> @enderror</div>
+        <button type="submit" class="auth-submit">Crear cuenta</button>
     </form>
-</x-guest-layout>
+    <div class="auth-divider"><span>o</span></div>
+    <div class="auth-footer-link">Ya tienes cuenta? <a href="{{ route('login') }}" class="auth-link">Inicia sesion</a></div>
+</x-auth-shell>

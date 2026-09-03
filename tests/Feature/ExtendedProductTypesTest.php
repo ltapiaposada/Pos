@@ -8,6 +8,7 @@ use App\Models\Inventory;
 use App\Models\InventoryLot;
 use App\Models\InventorySerial;
 use App\Models\Product;
+use App\Models\ProductVariantAttribute;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -73,7 +74,238 @@ class ExtendedProductTypesTest extends TestCase
             ->assertSee('class="input input-bordered w-full component-search"', false)
             ->assertSee('placeholder="Buscar por nombre, SKU o codigo"', false)
             ->assertSee("candidate.barcode", false)
-            ->assertSee("componentInput.value = candidate.id;", false);
+            ->assertSee("componentInput.value = candidate.id;", false)
+            ->assertSee('id="modifier-validation-error"', false)
+            ->assertSee('createRow();', false)
+            ->assertSee('createModifierGroup();', false)
+            ->assertSee('id="add-variant-attribute"', false)
+            ->assertSee('id="open-create-variant-attribute"', false)
+            ->assertSee('id="variant-attribute-modal"', false)
+            ->assertSee('id="variant-attribute-name"', false)
+            ->assertSee('Selecciona atributo')
+            ->assertSee('variant-attributes-preview', false);
+    }
+
+    public function test_create_product_form_saves_each_non_kit_product_type(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@pos.test')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('products.create'))
+            ->assertOk()
+            ->assertSee('value="'.Product::TYPE_SIMPLE.'"', false)
+            ->assertSee('value="'.Product::TYPE_SERVICE.'"', false)
+            ->assertSee('value="'.Product::TYPE_DIGITAL.'"', false)
+            ->assertSee('value="'.Product::TYPE_SERIALIZED.'"', false)
+            ->assertSee('value="'.Product::TYPE_BATCH.'"', false)
+            ->assertSee('value="'.Product::TYPE_VARIANT.'"', false);
+
+        foreach ([
+            Product::TYPE_SIMPLE => ['unit' => 'unit'],
+            Product::TYPE_SERVICE => ['unit' => 'service'],
+            Product::TYPE_DIGITAL => ['unit' => 'license', 'delivery_instructions' => 'Clave: DEMO-123'],
+            Product::TYPE_SERIALIZED => ['unit' => 'unit'],
+            Product::TYPE_BATCH => ['unit' => 'unit'],
+        ] as $type => $overrides) {
+            $this->actingAs($admin)
+                ->post(route('products.store'), array_merge([
+                    'name' => "Producto {$type}",
+                    'sku' => "CREATE-{$type}",
+                    'product_type' => $type,
+                    'cost_price' => 1,
+                    'sale_price' => 2,
+                    'is_active' => 1,
+                    'is_visible_ecommerce' => 0,
+                ], $overrides))
+                ->assertSessionHasNoErrors()
+                ->assertRedirect(route('products.index'));
+
+            $this->assertDatabaseHas('products', array_merge([
+                'sku' => "CREATE-{$type}",
+                'product_type' => $type,
+            ], array_intersect_key($overrides, ['unit' => true, 'delivery_instructions' => true])));
+        }
+
+        $parent = Product::query()->where('sku', 'CREATE-simple')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->post(route('products.store'), [
+                'name' => 'Variante guardada',
+                'sku' => 'CREATE-variant',
+                'unit' => 'unit',
+                'product_type' => Product::TYPE_VARIANT,
+                'parent_product_id' => $parent->id,
+                'cost_price' => 1,
+                'sale_price' => 2,
+                'is_active' => 1,
+                'is_visible_ecommerce' => 0,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('products.index'));
+
+        $this->assertDatabaseHas('products', [
+            'sku' => 'CREATE-variant',
+            'product_type' => Product::TYPE_VARIANT,
+            'parent_product_id' => $parent->id,
+        ]);
+    }
+
+    public function test_variant_product_creation_saves_parent_template_and_new_variant_children(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@pos.test')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->post(route('products.store'), [
+                'name' => 'Camisa',
+                'sku' => 'CAMISA',
+                'unit' => 'unit',
+                'product_type' => Product::TYPE_VARIANT,
+                'cost_price' => 10,
+                'sale_price' => 20,
+                'is_active' => 1,
+                'is_visible_ecommerce' => 1,
+                'variant_attribute_definitions' => [
+                    [
+                        'name' => 'Talla',
+                        'values' => ['L'],
+                    ],
+                    [
+                        'name' => 'Color',
+                        'values' => ['Rojo', 'Amarillo'],
+                    ],
+                ],
+                'variants' => [
+                    [
+                        'attributes' => [
+                            'Talla' => 'L',
+                            'Color' => 'Rojo',
+                        ],
+                        'sku' => 'CAMISA-L-ROJO',
+                        'barcode' => 'CAM-L-R',
+                        'unit' => 'unit',
+                        'cost_price' => 11,
+                        'sale_price' => 22,
+                        'is_active' => 1,
+                        'is_visible_ecommerce' => 1,
+                    ],
+                    [
+                        'attributes' => [
+                            'Talla' => 'L',
+                            'Color' => 'Amarillo',
+                        ],
+                        'sku' => 'CAMISA-L-AMARILLO',
+                        'barcode' => 'CAM-L-A',
+                        'unit' => 'unit',
+                        'cost_price' => 12,
+                        'sale_price' => 24,
+                        'is_active' => 1,
+                        'is_visible_ecommerce' => 1,
+                    ],
+                ],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('products.index'));
+
+        $parent = Product::query()->where('sku', 'CAMISA')->firstOrFail();
+        $redVariant = Product::query()->where('sku', 'CAMISA-L-ROJO')->firstOrFail();
+
+        $this->assertSame(Product::TYPE_SIMPLE, $parent->product_type);
+        $this->assertNull($parent->parent_product_id);
+        $this->assertSame(Product::TYPE_VARIANT, $redVariant->product_type);
+        $this->assertSame($parent->id, $redVariant->parent_product_id);
+        $this->assertSame(['Talla' => 'L', 'Color' => 'Rojo'], $redVariant->variant_attributes);
+
+        $size = ProductVariantAttribute::query()->where('name', 'Talla')->firstOrFail();
+        $color = ProductVariantAttribute::query()->where('name', 'Color')->firstOrFail();
+        $this->assertDatabaseHas('product_variant_attribute_values', [
+            'product_variant_attribute_id' => $size->id,
+            'value' => 'L',
+        ]);
+        $this->assertDatabaseHas('product_variant_attribute_values', [
+            'product_variant_attribute_id' => $color->id,
+            'value' => 'Rojo',
+        ]);
+        $this->assertDatabaseHas('product_variant_attribute_values', [
+            'product_variant_attribute_id' => $color->id,
+            'value' => 'Amarillo',
+        ]);
+    }
+
+    public function test_variant_attribute_modal_persists_attribute_catalog_immediately(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@pos.test')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->postJson(route('products.variant-attributes.store'), [
+                'name' => 'Talla',
+                'values' => ['L', 'M', 'S'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('name', 'Talla')
+            ->assertJsonPath('values.0', 'L');
+
+        $attribute = ProductVariantAttribute::query()->where('name', 'Talla')->firstOrFail();
+
+        $this->assertDatabaseHas('product_variant_attribute_values', [
+            'product_variant_attribute_id' => $attribute->id,
+            'value' => 'M',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('products.create'))
+            ->assertOk()
+            ->assertSee('<option value="'.$attribute->id.'">Talla</option>', false);
+    }
+
+    public function test_pos_returns_variant_parent_as_selector_with_available_children(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@pos.test')->firstOrFail();
+        $parent = Product::query()->create([
+            'name' => 'Camisa',
+            'sku' => 'POS-CAMISA',
+            'unit' => 'unit',
+            'product_type' => Product::TYPE_SIMPLE,
+            'cost_price' => 10,
+            'sale_price' => 20,
+            'is_active' => true,
+            'is_visible_ecommerce' => true,
+        ]);
+        $variant = Product::query()->create([
+            'name' => 'Camisa - Talla L - Color Rojo',
+            'sku' => 'POS-CAMISA-L-ROJO',
+            'unit' => 'unit',
+            'product_type' => Product::TYPE_VARIANT,
+            'parent_product_id' => $parent->id,
+            'variant_attributes' => ['Talla' => 'L', 'Color' => 'Rojo'],
+            'cost_price' => 11,
+            'sale_price' => 22,
+            'is_active' => true,
+            'is_visible_ecommerce' => true,
+        ]);
+        Inventory::query()->create([
+            'branch_id' => $admin->branch_id,
+            'product_id' => $variant->id,
+            'stock' => 5,
+            'min_stock' => 0,
+        ]);
+
+        $payload = $this->actingAs($admin)
+            ->getJson(route('pos.products', [
+                'branch_id' => $admin->branch_id,
+                'q' => 'POS-CAMISA',
+            ]))
+            ->assertOk()
+            ->json();
+
+        $product = collect($payload)->firstWhere('id', $parent->id);
+        $this->assertNotNull($product);
+        $this->assertTrue($product['has_variants']);
+        $this->assertSame($variant->id, $product['variants'][0]['id']);
+        $this->assertSame(['Talla' => 'L', 'Color' => 'Rojo'], $product['variants'][0]['attributes']);
     }
 
     public function test_kit_product_and_its_component_are_saved(): void

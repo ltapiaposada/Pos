@@ -145,7 +145,7 @@
                                 <p class="text-sm font-semibold">#{{ $order->sale_number }}</p>
                                 <p class="text-xs text-base-content/60">{{ $order->sold_at?->format('Y-m-d H:i') }}</p>
                             </div>
-                            <span class="badge badge-ghost badge-sm">{{ $statusOptions[$order->status] ?? strtoupper($order->status) }}</span>
+                            <span class="badge badge-ghost badge-sm">{{ $statusLabels[$order->status] ?? strtoupper($order->status) }}</span>
                         </div>
                         <div class="mt-3 space-y-1 text-sm">
                             <p><span class="text-base-content/60">Cliente:</span> {{ $order->customer?->name ?? 'Sin cliente' }}</p>
@@ -207,7 +207,7 @@
                                 <td>#{{ $order->sale_number }}</td>
                                 <td>{{ $order->sold_at?->format('Y-m-d H:i') }}</td>
                                 <td>{{ $order->customer?->name }}</td>
-                                <td>{{ $statusOptions[$order->status] ?? strtoupper($order->status) }}</td>
+                                <td>{{ $statusLabels[$order->status] ?? strtoupper($order->status) }}</td>
                                 <td>{{ $paymentLabels[$order->payments->first()?->method ?? ''] ?? 'Sin registrar' }}</td>
                                 <td>
                                     @if ($order->invoiced_at)

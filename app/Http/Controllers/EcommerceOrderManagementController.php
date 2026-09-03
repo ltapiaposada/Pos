@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\RestaurantOrder;
 use App\Models\Sale;
 use App\Services\AccountingPostingService;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class EcommerceOrderManagementController extends Controller
@@ -66,7 +67,8 @@ class EcommerceOrderManagementController extends Controller
         return view('ecommerce_admin.orders.index', [
             'orders' => $orders,
             'restaurantOrders' => $restaurantOrders,
-            'statusOptions' => $this->statusOptions(),
+            'statusOptions' => $this->filterStatusOptions($request),
+            'statusLabels' => $this->statusLabels(),
             'saleStatusOptions' => $this->saleStatusOptions(),
             'restaurantStatusOptions' => RestaurantOrder::statusOptions(),
             'isRestaurantService' => $isRestaurantService,
@@ -81,7 +83,7 @@ class EcommerceOrderManagementController extends Controller
 
         return view('ecommerce_admin.orders.show', [
             'order' => $sale,
-            'statusOptions' => $this->statusOptions(),
+            'statusOptions' => $this->saleStatusOptions(),
         ]);
     }
 
@@ -90,7 +92,7 @@ class EcommerceOrderManagementController extends Controller
         abort_unless($sale->order_source === $this->serviceSaleSource($request), 404);
 
         $data = $request->validate([
-            'status' => ['required', 'in:pending,processing,shipped,delivered,cancelled'],
+            'status' => ['required', Rule::in(array_keys($this->saleStatusOptions()))],
         ]);
 
         $sale->update([
@@ -143,9 +145,16 @@ class EcommerceOrderManagementController extends Controller
         return redirect()->route('ecommerce-admin.orders.index')->with('status', 'Pedido facturado y contabilizado correctamente.');
     }
 
-    private function statusOptions(): array
+    private function statusLabels(): array
     {
         return $this->saleStatusOptions() + RestaurantOrder::statusOptions();
+    }
+
+    private function filterStatusOptions(Request $request): array
+    {
+        return \App\Support\CompanyContext::isRestaurantService($request->user()?->company)
+            ? RestaurantOrder::statusOptions()
+            : $this->saleStatusOptions();
     }
 
     private function saleStatusOptions(): array
@@ -164,11 +173,11 @@ class EcommerceOrderManagementController extends Controller
     {
         $method = (string) $sale->payments()->orderBy('id')->value('method');
 
-        if (in_array($method, ['transfer', 'qr'], true) && in_array($status, [Sale::STATUS_PROCESSING, Sale::STATUS_SHIPPED, Sale::STATUS_DELIVERED], true)) {
+        if (in_array($method, ['transfer', 'qr'], true) && in_array($status, [Sale::STATUS_PAID, Sale::STATUS_PROCESSING, Sale::STATUS_SHIPPED, Sale::STATUS_DELIVERED], true)) {
             return (float) $sale->total;
         }
 
-        if ($method === 'contraentrega' && $status === Sale::STATUS_DELIVERED) {
+        if ($method === 'contraentrega' && in_array($status, [Sale::STATUS_PAID, Sale::STATUS_DELIVERED], true)) {
             return (float) $sale->total;
         }
 
@@ -180,11 +189,11 @@ class EcommerceOrderManagementController extends Controller
         $method = (string) $sale->payments()->orderBy('id')->value('method');
 
         if (in_array($method, ['transfer', 'qr'], true)) {
-            return in_array($sale->status, [Sale::STATUS_PROCESSING, Sale::STATUS_SHIPPED, Sale::STATUS_DELIVERED], true);
+            return in_array($sale->status, [Sale::STATUS_PAID, Sale::STATUS_PROCESSING, Sale::STATUS_SHIPPED, Sale::STATUS_DELIVERED], true);
         }
 
         if ($method === 'contraentrega') {
-            return $sale->status === Sale::STATUS_DELIVERED;
+            return in_array($sale->status, [Sale::STATUS_PAID, Sale::STATUS_DELIVERED], true);
         }
 
         return false;
@@ -197,4 +206,3 @@ class EcommerceOrderManagementController extends Controller
             : Sale::SOURCE_ECOMMERCE;
     }
 }
-

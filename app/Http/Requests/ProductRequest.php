@@ -48,6 +48,22 @@ class ProductRequest extends FormRequest
             'sale_price' => ['required', 'numeric', 'min:0'],
             'is_active' => ['required', 'boolean'],
             'is_visible_ecommerce' => ['required', 'boolean'],
+            'variants' => ['nullable', 'array'],
+            'variants.*.id' => ['nullable', 'integer', CompanyRules::companyScoped('products')],
+            'variants.*.name' => ['nullable', 'string', 'max:255'],
+            'variants.*.attributes' => ['nullable', 'array'],
+            'variants.*.attributes.*' => ['nullable', 'string', 'max:120'],
+            'variants.*.sku' => ['nullable', 'string', 'max:64'],
+            'variants.*.barcode' => ['nullable', 'string', 'max:64'],
+            'variants.*.cost_price' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.sale_price' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.unit' => ['nullable', Rule::in(array_keys(Product::unitOptions()))],
+            'variants.*.is_active' => ['nullable', 'boolean'],
+            'variants.*.is_visible_ecommerce' => ['nullable', 'boolean'],
+            'variant_attribute_definitions' => ['nullable', 'array'],
+            'variant_attribute_definitions.*.name' => ['nullable', 'string', 'max:120'],
+            'variant_attribute_definitions.*.values' => ['nullable', 'array'],
+            'variant_attribute_definitions.*.values.*' => ['nullable', 'string', 'max:120'],
             'kit_items' => ['nullable', 'array'],
             'kit_items.*.component_product_id' => ['required_with:kit_items.*.quantity', 'integer', CompanyRules::companyScoped('products')],
             'kit_items.*.quantity' => ['required_with:kit_items.*.component_product_id', 'numeric', 'gt:0'],
@@ -78,6 +94,9 @@ class ProductRequest extends FormRequest
             $usesComponentGroups = $this->boolean('uses_component_groups');
             $productId = $this->route('product')?->id;
             $parentProductId = $this->input('parent_product_id');
+            $variants = collect($this->input('variants', []))
+                ->filter(fn ($variant) => ! empty($variant['sku']) || ! empty($variant['name']) || collect($variant['attributes'] ?? [])->filter()->isNotEmpty())
+                ->values();
             $legacyModifierOptionIds = ProductModifierOption::query()
                 ->whereIn('id', collect($this->input('modifier_groups', []))
                     ->flatMap(fn ($group) => collect($group['options'] ?? [])->pluck('id'))
@@ -92,7 +111,7 @@ class ProductRequest extends FormRequest
                 ->filter(fn ($item) => ! empty($item['component_product_id']));
 
             if ($type === Product::TYPE_VARIANT) {
-                if (! $parentProductId) {
+                if (! $parentProductId && $variants->isEmpty()) {
                     $validator->errors()->add('parent_product_id', 'Debes seleccionar un producto base para la variante.');
                 }
 
@@ -103,6 +122,54 @@ class ProductRequest extends FormRequest
                 $parentType = Product::query()->whereKey($parentProductId)->value('product_type');
                 if ($parentType === Product::TYPE_VARIANT) {
                     $validator->errors()->add('parent_product_id', 'El producto base no puede ser otra variante.');
+                }
+
+                if (! $parentProductId) {
+                    if ($variants->isEmpty()) {
+                        $validator->errors()->add('variants', 'Debes agregar al menos una variante al producto.');
+                    }
+
+                    $skus = $variants->pluck('sku')->filter()->map(fn ($sku) => mb_strtolower(trim((string) $sku)));
+                    if ($skus->count() !== $skus->unique()->count()) {
+                        $validator->errors()->add('variants', 'No puedes repetir SKU entre variantes.');
+                    }
+
+                    $barcodes = $variants->pluck('barcode')->filter()->map(fn ($barcode) => mb_strtolower(trim((string) $barcode)));
+                    if ($barcodes->count() !== $barcodes->unique()->count()) {
+                        $validator->errors()->add('variants', 'No puedes repetir codigos de barras entre variantes.');
+                    }
+
+                    $companyId = CompanyContext::authenticatedCompanyId();
+                    $variants->each(function (array $variant, int $index) use ($validator, $companyId): void {
+                        if (empty($variant['sku'])) {
+                            $validator->errors()->add("variants.{$index}.sku", 'Cada variante debe tener SKU.');
+                        }
+                        if (collect($variant['attributes'] ?? [])->filter()->isEmpty() && empty($variant['name'])) {
+                            $validator->errors()->add("variants.{$index}.name", 'Indica al menos un atributo o nombre para la variante.');
+                        }
+
+                        if (! empty($variant['sku'])) {
+                            $exists = Product::query()
+                                ->where('company_id', $companyId)
+                                ->where('sku', $variant['sku'])
+                                ->when(! empty($variant['id']), fn ($query) => $query->whereKeyNot((int) $variant['id']))
+                                ->exists();
+                            if ($exists) {
+                                $validator->errors()->add("variants.{$index}.sku", 'El SKU de la variante ya esta en uso.');
+                            }
+                        }
+
+                        if (! empty($variant['barcode'])) {
+                            $exists = Product::query()
+                                ->where('company_id', $companyId)
+                                ->where('barcode', $variant['barcode'])
+                                ->when(! empty($variant['id']), fn ($query) => $query->whereKeyNot((int) $variant['id']))
+                                ->exists();
+                            if ($exists) {
+                                $validator->errors()->add("variants.{$index}.barcode", 'El codigo de barras de la variante ya esta en uso.');
+                            }
+                        }
+                    });
                 }
             }
 

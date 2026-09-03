@@ -1,545 +1,282 @@
 @extends('ecommerce.layouts.app')
 
 @section('content')
+    @php
+        $pageProducts = $products->getCollection();
+        $visibleCategories = $pageProducts->pluck('category')->filter()->unique('id')->values();
+        $palette = [
+            ['tint' => 'var(--shop-gold-tint)', 'tone' => 'var(--shop-gold)', 'accent' => 'var(--shop-forest)'],
+            ['tint' => 'var(--shop-clay-tint)', 'tone' => 'var(--shop-clay)', 'accent' => 'var(--shop-slate)'],
+            ['tint' => 'var(--shop-forest-tint)', 'tone' => 'var(--shop-forest)', 'accent' => 'var(--shop-gold)'],
+            ['tint' => 'var(--shop-slate-tint)', 'tone' => 'var(--shop-slate)', 'accent' => 'var(--shop-clay)'],
+        ];
+    @endphp
+
     <style>
-        .shop-hero {
-            background: radial-gradient(1200px 400px at 10% 10%, #c7d2fe 0%, rgba(199,210,254,0) 60%),
-                        linear-gradient(135deg, #0f172a 0%, #1d4ed8 45%, #0ea5e9 100%);
-            border-radius: 1.25rem;
-            color: #fff;
-            padding: 2rem;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
-        }
-        .shop-hero::after {
-            content: "";
-            position: absolute;
-            right: -70px;
-            top: -90px;
-            width: 260px;
-            height: 260px;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.18);
-            filter: blur(1px);
-        }
-        .hero-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .45rem;
-            padding: .35rem .75rem;
-            border-radius: 999px;
-            background: rgba(15, 23, 42, 0.52);
-            border: 1px solid rgba(191, 219, 254, 0.45);
-            color: #f8fafc;
-            font-weight: 700;
-            font-size: .78rem;
-            letter-spacing: .03em;
-            text-transform: uppercase;
-        }
-        .hero-search {
-            background: #fff;
-            border-radius: .95rem;
-            padding: .5rem;
-            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
-        }
-        .hero-kpi {
-            background: rgba(255,255,255,0.16);
-            border: 1px solid rgba(255,255,255,0.22);
-            border-radius: .9rem;
-            padding: .75rem .9rem;
-        }
-        .hero-benefits {
-            background: rgba(255,255,255,.12);
-            border: 1px solid rgba(255,255,255,.22);
-            border-radius: 1rem;
-            padding: 1rem;
-            backdrop-filter: blur(4px);
-        }
-        .hero-benefits__item {
-            border-radius: .75rem;
-            padding: .55rem .7rem;
-            background: rgba(255,255,255,.10);
-            font-size: .85rem;
-        }
-        .product-card-modern {
-            border: 1px solid #e2e8f0;
-            border-radius: 1rem;
-            overflow: hidden;
-            transition: transform .18s ease, box-shadow .18s ease;
-            box-shadow: 0 8px 20px rgba(15,23,42,.06);
-        }
-        .product-card-modern:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 14px 28px rgba(15,23,42,.12);
-        }
-        .product-img-modern {
-            height: 210px;
-            object-fit: cover;
-            width: 100%;
-            background: #e2e8f0;
-        }
-        .price-tag {
-            background: #e0f2fe;
-            color: #0c4a6e;
-            border-radius: .7rem;
-            padding: .3rem .6rem;
-            font-weight: 700;
-            font-size: .95rem;
-        }
-        .product-kind-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: .22rem .58rem;
-            border-radius: 999px;
-            font-size: .7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .02em;
-            width: fit-content;
-        }
-        .product-kind-badge--kit {
-            background: #dcfce7;
-            color: #166534;
-        }
-        .product-kind-badge--variant {
-            background: #ede9fe;
-            color: #5b21b6;
-        }
-        .product-kind-meta {
-            margin-top: .3rem;
-            font-size: .78rem;
-            color: #64748b;
-            line-height: 1.35;
-        }
-        .shop-cart-cta {
-            color: #0f172a;
-            border-color: #94a3b8;
-            background: #fff;
-        }
-        .shop-cart-cta:hover,
-        .shop-cart-cta:focus {
-            color: #0f172a;
-            background: #e2e8f0;
-            border-color: #64748b;
-        }
-        .variant-choice-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .45rem;
-            margin-top: .6rem;
-        }
-        .variant-choice-input {
-            display: none;
-        }
-        .variant-choice-label {
-            border: 1px solid #cbd5e1;
-            border-radius: 999px;
-            background: #f8fafc;
-            color: #0f172a;
-            font-size: .75rem;
-            font-weight: 700;
-            padding: .35rem .6rem;
-            cursor: pointer;
-            line-height: 1.2;
-            min-width: 2rem;
-            text-align: center;
-            flex: 0 0 auto;
-        }
-        .variant-choice-input:checked + .variant-choice-label {
-            border-color: #2563eb;
-            background: #dbeafe;
-            color: #1d4ed8;
-        }
-        .kit-components-list {
-            margin-top: .4rem;
-            margin-bottom: 0;
-            padding-left: 1.1rem;
-            font-size: .78rem;
-            color: #475569;
-            list-style-type: disc;
-            list-style-position: outside;
-            text-align: left;
-        }
-        .kit-components-list li {
-            margin: .15rem 0;
-        }
-        .restaurant-configurator {
-            margin-top: auto;
-            padding-top: 1rem;
-            border-top: 1px solid #e2e8f0;
-        }
-        .restaurant-configurator summary {
-            list-style: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .75rem;
-            padding: .8rem .95rem;
-            border-radius: .9rem;
-            border: 1px solid #bfdbfe;
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-            color: #0f172a;
-            font-weight: 700;
-            box-shadow: 0 10px 24px rgba(37, 99, 235, .08);
-        }
-        .restaurant-configurator summary::-webkit-details-marker {
-            display: none;
-        }
-        .restaurant-configurator summary::after {
-            content: "Abrir";
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 78px;
-            padding: .35rem .65rem;
-            border-radius: 999px;
-            background: #1d4ed8;
-            color: #fff;
-            font-size: .75rem;
-            font-weight: 700;
-            letter-spacing: .02em;
-        }
-        .restaurant-configurator[open] summary::after {
-            content: "Cerrar";
-            background: #0f172a;
-        }
-        .restaurant-configurator__label {
-            font-size: .78rem;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            font-weight: 700;
-        }
-        .restaurant-configurator__summary-copy {
-            display: flex;
-            flex-direction: column;
-            gap: .15rem;
-        }
-        .restaurant-configurator__summary-title {
-            font-size: .92rem;
-            font-weight: 800;
-            color: #0f172a;
-            line-height: 1.2;
-        }
-        .restaurant-configurator__group {
-            border: 1px solid #dbeafe;
-            border-radius: .95rem;
-            padding: .85rem;
-            background: #f8fbff;
-        }
-        .restaurant-configurator__title {
-            font-size: .88rem;
-            font-weight: 700;
-            margin-bottom: .2rem;
-            color: #0f172a;
-        }
-        .restaurant-configurator__hint {
-            font-size: .76rem;
-            color: #64748b;
-            margin-bottom: .65rem;
-        }
-        .restaurant-configurator__options {
-            display: grid;
-            gap: .55rem;
-        }
-        .restaurant-configurator__option {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .75rem;
-            padding: .55rem .7rem;
-            border-radius: .8rem;
-            background: #fff;
-            border: 1px solid #dbeafe;
-        }
-        .restaurant-configurator__option label {
-            display: flex;
-            align-items: center;
-            gap: .55rem;
-            margin: 0;
-            flex: 1;
-            cursor: pointer;
-            color: #0f172a;
-            font-size: .88rem;
-        }
-        .restaurant-configurator__price {
-            font-size: .76rem;
-            font-weight: 700;
-            color: #0369a1;
-            white-space: nowrap;
-        }
-        body.dark-mode .shop-hero {
-            background: radial-gradient(1200px 420px at 10% 10%, rgba(59, 130, 246, .25) 0%, rgba(59,130,246,0) 60%),
-                        linear-gradient(135deg, #0b1220 0%, #1e3a8a 50%, #0369a1 100%);
-            box-shadow: 0 24px 50px rgba(2, 6, 23, .55);
-        }
-        body.dark-mode .hero-pill {
-            background: rgba(15, 23, 42, .72);
-            border-color: rgba(125, 211, 252, .4);
-        }
-        body.dark-mode .hero-search {
-            background: rgba(15, 23, 42, .88);
-            box-shadow: 0 12px 28px rgba(2, 6, 23, .55);
-        }
-        body.dark-mode .hero-search .form-control {
-            background: transparent;
-            color: #e2e8f0;
-        }
-        body.dark-mode .hero-search .form-control::placeholder {
-            color: #94a3b8;
-        }
-        body.dark-mode .hero-benefits,
-        body.dark-mode .hero-benefits__item,
-        body.dark-mode .hero-kpi {
-            background: rgba(15, 23, 42, .36);
-            border-color: rgba(125, 211, 252, .25);
-            color: #e2e8f0;
-        }
-        body.dark-mode .product-card-modern {
-            border-color: rgba(71, 85, 105, .5);
-            background: rgba(15, 23, 42, .84) !important;
-            box-shadow: 0 12px 26px rgba(2, 6, 23, .45);
-        }
-        body.dark-mode .product-card-modern:hover {
-            box-shadow: 0 18px 34px rgba(2, 6, 23, .65);
-        }
-        body.dark-mode .product-img-modern {
-            background: #1e293b;
-        }
-        body.dark-mode .product-card-modern .h6,
-        body.dark-mode .product-card-modern .text-muted {
-            color: #e2e8f0 !important;
-        }
-        body.dark-mode .product-kind-meta,
-        body.dark-mode .kit-components-list {
-            color: #94a3b8;
-        }
-        body.dark-mode .price-tag {
-            background: rgba(30, 58, 138, .45);
-            color: #bfdbfe;
-            border: 1px solid rgba(147, 197, 253, .35);
-        }
-        body.dark-mode .variant-choice-label {
-            border-color: #475569;
-            background: rgba(15, 23, 42, .7);
-            color: #e2e8f0;
-        }
-        body.dark-mode .variant-choice-input:checked + .variant-choice-label {
-            border-color: #3b82f6;
-            background: rgba(30, 58, 138, .52);
-            color: #bfdbfe;
-        }
-        body.dark-mode .shop-cart-cta {
-            color: #e2e8f0;
-            border-color: #475569;
-            background: rgba(15, 23, 42, .75);
-        }
-        body.dark-mode .shop-cart-cta:hover,
-        body.dark-mode .shop-cart-cta:focus {
-            color: #f8fafc;
-            background: rgba(30, 41, 59, .95);
-            border-color: #64748b;
-        }
-        body.dark-mode .alert-secondary {
-            background: rgba(15, 23, 42, .78);
-            color: #e2e8f0;
-            border-color: rgba(71, 85, 105, .5);
-        }
-        body.dark-mode .restaurant-configurator {
-            border-top-color: rgba(71, 85, 105, .55);
-        }
-        body.dark-mode .restaurant-configurator summary,
-        body.dark-mode .restaurant-configurator__title,
-        body.dark-mode .restaurant-configurator__option label {
-            color: #e2e8f0;
-        }
-        body.dark-mode .restaurant-configurator summary {
-            background: linear-gradient(135deg, rgba(30, 64, 175, .35) 0%, rgba(3, 105, 161, .32) 100%);
-            border-color: rgba(125, 211, 252, .22);
-            box-shadow: 0 12px 28px rgba(2, 6, 23, .35);
-        }
-        body.dark-mode .restaurant-configurator summary::after {
-            background: #38bdf8;
-            color: #082f49;
-        }
-        body.dark-mode .restaurant-configurator[open] summary::after {
-            background: #e2e8f0;
-            color: #0f172a;
-        }
-        body.dark-mode .restaurant-configurator__label,
-        body.dark-mode .restaurant-configurator__hint {
-            color: #94a3b8;
-        }
-        body.dark-mode .restaurant-configurator__summary-title {
-            color: #e2e8f0;
-        }
-        body.dark-mode .restaurant-configurator__group {
-            background: rgba(15, 23, 42, .7);
-            border-color: rgba(59, 130, 246, .22);
-        }
-        body.dark-mode .restaurant-configurator__option {
-            background: rgba(15, 23, 42, .65);
-            border-color: rgba(71, 85, 105, .55);
-        }
-        body.dark-mode .restaurant-configurator__price {
-            color: #7dd3fc;
-        }
+        .shop-hero { position: relative; overflow: hidden; background: var(--shop-forest); color: #fff; }
+        .shop-hero__mark { position: absolute; top: -70px; right: -70px; width: 360px; height: 360px; opacity: .14; pointer-events: none; }
+        .shop-hero__inner { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 80px 48px 56px; display: grid; grid-template-columns: 1.15fr .7fr; gap: 60px; align-items: end; }
+        .shop-hero__eyebrow { margin-bottom: 18px; color: #B9D0C4; font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+        .shop-hero h1 { max-width: 12ch; margin: 0; color: #fff; font-size: 48px; font-weight: 560; letter-spacing: 0; line-height: 1.1; }
+        .shop-hero p { max-width: 42ch; margin: 18px 0 0; color: #D3E0DA; font-size: 16.5px; line-height: 1.55; }
+        .shop-search { max-width: 480px; margin-top: 30px; padding: 5px; border-radius: var(--shop-radius-s); background: #fff; display: flex; gap: 8px; }
+        .shop-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; padding: 11px 14px; color: var(--shop-ink); font: inherit; font-size: 14.5px; }
+        .shop-search input::placeholder { color: #9A968A; }
+        .shop-search button, .shop-product__add { border: 0; border-radius: 6px; background: var(--shop-ink); color: #fff; font-weight: 700; }
+        .shop-search button { padding: 0 22px; font-size: 14px; }
+        .shop-search button:hover, .shop-product__add:hover { background: var(--shop-forest-dark); }
+        .shop-hero-panel { border-radius: var(--shop-radius-m); background: #EFE7D8; color: var(--shop-ink); padding: 24px; }
+        .shop-hero-panel__kicker { color: var(--shop-ink-soft); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+        .shop-hero-panel__figure { margin-top: 6px; font-family: "Fraunces", Georgia, serif; font-size: 42px; font-weight: 560; line-height: 1; }
+        .shop-hero-panel__label { margin-top: 5px; color: var(--shop-ink-soft); font-size: 13px; }
+        .shop-hero-panel hr { margin: 16px 0; border: 0; border-top: 1px solid #DCD2B8; }
+        .shop-hero-panel ul { margin: 0; padding: 0; list-style: none; }
+        .shop-hero-panel li { padding: 5px 0; color: var(--shop-ink-soft); display: flex; align-items: center; gap: 9px; font-size: 13px; }
+        .shop-hero-panel svg { color: var(--shop-forest); flex: 0 0 auto; }
+        .shop-discover, .shop-categories, .shop-catalog, .shop-story { max-width: 1280px; margin: 0 auto; padding-inline: 48px; }
+        .shop-discover { padding-top: 44px; padding-bottom: 8px; }
+        .shop-discover h2 { margin: 0 0 20px; font-size: 20px; font-weight: 650; }
+        .shop-discover__row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+        .shop-discover__tile { border: 1px solid var(--shop-line); border-radius: var(--shop-radius-s); background: #fff; padding: 20px 10px; color: var(--shop-ink); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+        .shop-discover__tile:hover, .shop-discover__tile:focus { border-color: var(--shop-forest); color: var(--shop-ink); }
+        .shop-discover__dot { width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+        .shop-discover__tile span { font-size: 12.5px; font-weight: 700; }
+        .shop-categories { margin-top: 14px; padding-top: 26px; padding-bottom: 22px; border-bottom: 1px solid var(--shop-line); display: flex; gap: 26px; overflow-x: auto; }
+        .shop-chip { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--shop-ink-soft); padding: 0 0 4px; white-space: nowrap; font: inherit; font-size: 14px; font-weight: 500; }
+        .shop-chip:hover, .shop-chip.is-active { color: var(--shop-ink); }
+        .shop-chip.is-active { border-color: var(--shop-forest); font-weight: 700; }
+        .shop-catalog { padding-top: 36px; padding-bottom: 20px; }
+        .shop-catalog__head { margin-bottom: 26px; display: flex; align-items: baseline; justify-content: space-between; gap: 18px; }
+        .shop-catalog__head h2 { margin: 0; font-size: 24px; font-weight: 560; }
+        .shop-catalog__head span { color: var(--shop-ink-soft); font-size: 13.5px; }
+        .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 30px 24px; }
+        .shop-product[hidden] { display: none; }
+        .shop-product { min-width: 0; height: 100%; display: flex; flex-direction: column; }
+        .shop-product__media { position: relative; aspect-ratio: 4 / 5; border-radius: var(--shop-radius-s); overflow: hidden; margin-bottom: 14px; display: flex; align-items: center; justify-content: center; }
+        .product-image-trigger { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; padding: 0; cursor: zoom-in; }
+        .shop-product__image-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+        .shop-product__image { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .shop-product__initial { font-family: "Fraunces", Georgia, serif; font-size: 96px; font-weight: 560; line-height: 1; text-transform: uppercase; }
+        .shop-stock-tag, .shop-product-badge { border: 1px solid var(--shop-line); border-radius: 999px; background: #fff; color: var(--shop-ink); font-size: 11px; font-weight: 700; }
+        .shop-stock-tag { position: absolute; top: 10px; left: 10px; padding: 4px 10px; }
+        .shop-product-badge { display: inline-flex; width: fit-content; margin-top: 6px; padding: 3px 9px; }
+        .shop-product__qty { width: 52px; min-height: 38px; border: 1px solid var(--shop-line); border-radius: 6px; background: #fff; text-align: center; font: inherit; font-size: 13px; padding: 7px 2px; }
+        .shop-product__add { min-height: 38px; padding: 0 14px; font-size: 12.5px; }
+        .shop-product h3 { margin: 0; color: var(--shop-ink); font-family: "Inter", system-ui, sans-serif; font-size: 14.5px; font-weight: 700; line-height: 1.35; }
+        .shop-product__category, .shop-product__meta, .shop-configurator__hint { color: var(--shop-ink-soft); font-size: 12.5px; line-height: 1.45; }
+        .shop-product__category { margin-top: 5px; }
+        .shop-product__badges:empty { display: none; }
+        .shop-price { display: inline-block; margin-top: 8px; border-radius: 6px; background: var(--shop-forest-tint); color: var(--shop-forest-dark); font-family: "Fraunces", Georgia, serif; font-size: 17px; font-weight: 560; line-height: 1.2; padding: 3px 10px; }
+        .variant-choice-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .variant-choice-input { position: absolute; opacity: 0; pointer-events: none; }
+        .variant-choice-label { border: 1px solid var(--shop-line); border-radius: 999px; background: var(--shop-paper-soft); color: var(--shop-ink); cursor: pointer; font-size: 12px; font-weight: 700; line-height: 1.2; min-width: 32px; padding: 6px 9px; text-align: center; }
+        .variant-choice-input:checked + .variant-choice-label { border-color: var(--shop-forest); background: var(--shop-forest); color: #fff; }
+        .shop-product__form { margin-top: auto; padding-top: 14px; }
+        .shop-product__buy-row { display: flex; align-items: center; gap: 8px; margin-top: 0; }
+        .shop-product__buy-row .shop-product__add { flex: 1; }
+        .kit-components-list { margin: 8px 0 0; padding-left: 18px; color: var(--shop-ink-soft); font-size: 12.5px; }
+        .shop-configurator { margin-top: auto; padding-top: 14px; }
+        .shop-configurator__trigger { width: 100%; border: 0; border-radius: 6px; background: var(--shop-ink); color: #fff; min-height: 38px; padding: 8px 16px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 700; }
+        .shop-configurator__trigger:hover, .shop-configurator__trigger:focus { background: var(--shop-forest-dark); }
+        .shop-configurator__body { padding: 20px; }
+        .shop-configurator__title { color: var(--shop-ink); font-size: 13.5px; font-weight: 800; }
+        .shop-configurator__label { color: var(--shop-ink-soft); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+        .shop-configurator__group { border: 1px solid var(--shop-line); border-radius: var(--shop-radius-s); background: #fff; padding: 12px; }
+        .shop-configurator__options { display: grid; gap: 8px; margin-top: 10px; }
+        .shop-configurator__option { border: 1px solid var(--shop-line); border-radius: var(--shop-radius-s); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .shop-configurator__option label { margin: 0; color: var(--shop-ink); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .shop-configurator__price { color: var(--shop-gold); font-size: 12px; font-weight: 800; white-space: nowrap; }
+        .shop-empty { border: 1px solid var(--shop-line); border-radius: var(--shop-radius-s); background: var(--shop-paper-soft); padding: 22px; color: var(--shop-ink-soft); }
+        .shop-story { margin-top: 24px; padding-top: 64px; padding-bottom: 64px; border-top: 1px solid var(--shop-line); display: grid; grid-template-columns: .85fr 1.15fr; gap: 60px; align-items: center; }
+        .shop-story h2 { max-width: 12ch; margin: 0; font-size: 30px; font-weight: 560; line-height: 1.2; }
+        .shop-story__list { display: flex; flex-direction: column; gap: 26px; }
+        .shop-story__item { display: flex; gap: 16px; }
+        .shop-story__num { width: 32px; flex: 0 0 auto; color: var(--shop-forest); font-family: "Fraunces", Georgia, serif; font-size: 22px; }
+        .shop-story__item h3 { margin: 0; font-family: "Inter", system-ui, sans-serif; font-size: 15px; font-weight: 800; }
+        .shop-story__item p { max-width: 46ch; margin: 4px 0 0; color: var(--shop-ink-soft); font-size: 13.5px; line-height: 1.5; }
+        .product-image-modal, .product-config-modal { position: fixed; inset: 0; z-index: 1080; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(18, 51, 41, .72); }
+        .product-image-modal.is-open, .product-config-modal.is-open { display: flex; }
+        .product-image-modal__dialog { width: min(800px, 100%); max-height: 92vh; border-radius: var(--shop-radius-m); overflow: hidden; background: #fff; box-shadow: 0 24px 60px rgba(0, 0, 0, .28); }
+        .product-image-modal__header, .product-config-modal__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 14px 18px; border-bottom: 1px solid var(--shop-line); background: var(--shop-paper-soft); }
+        .shop-modal-close { width: 34px; height: 34px; border: 1px solid var(--shop-line); border-radius: 50%; background: #fff; color: var(--shop-ink); cursor: pointer; display: inline-grid; place-items: center; font-size: 23px; font-weight: 400; line-height: 1; }
+        .shop-modal-close:hover, .shop-modal-close:focus { border-color: var(--shop-forest); background: var(--shop-forest-tint); color: var(--shop-forest-dark); }
+        .product-image-modal__title { margin: 0; color: var(--shop-ink); font-family: "Inter", system-ui, sans-serif; font-size: 1rem; font-weight: 800; }
+        .product-image-modal__body { background: var(--shop-paper-soft); display: grid; place-items: center; max-height: calc(92vh - 62px); padding: 18px; }
+        .product-image-modal__img { display: block; width: auto; max-width: 100%; max-height: calc(92vh - 98px); border-radius: var(--shop-radius-s); object-fit: contain; }
+        .product-config-modal__dialog { width: min(880px, calc(100vw - 48px)); height: min(620px, calc(100vh - 48px)); overflow: hidden; border-radius: var(--shop-radius-m); background: #fff; box-shadow: 0 24px 60px rgba(0, 0, 0, .28); }
+        .product-config-modal__title { margin: 0; color: var(--shop-ink); font-family: "Fraunces", Georgia, serif; font-size: 22px; font-weight: 560; }
+        .product-config-modal__body { height: calc(100% - 61px); min-height: 0; display: grid; grid-template-columns: .8fr 1.2fr; }
+        .product-config-modal__media { min-height: 100%; background: var(--shop-forest-tint); display: flex; align-items: center; justify-content: center; padding: 24px; }
+        .product-config-modal__media img { width: 100%; max-height: 540px; border-radius: var(--shop-radius-s); object-fit: contain; }
+        .product-config-modal__initial { color: var(--shop-forest); font-family: "Fraunces", Georgia, serif; font-size: 120px; font-weight: 560; }
+        .product-config-modal__content { min-height: 0; overflow: auto; padding: 22px; }
+        @media (max-width: 960px) { .shop-hero__inner, .shop-story { grid-template-columns: 1fr; } .shop-discover__row { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 640px) { .shop-hero__inner { padding: 44px 20px 40px; gap: 28px; } .shop-hero h1 { font-size: 34px; } .shop-search { flex-direction: column; } .shop-search button { min-height: 42px; } .shop-discover, .shop-categories, .shop-catalog, .shop-story { padding-inline: 20px; } .shop-discover { padding-top: 34px; } .shop-discover__row { grid-template-columns: repeat(2, 1fr); gap: 10px; } .shop-catalog__head { align-items: flex-start; flex-direction: column; } .shop-story { padding-top: 44px; padding-bottom: 44px; } .product-image-modal, .product-config-modal { padding: 14px; } .product-config-modal__dialog { width: calc(100vw - 28px); height: min(620px, calc(100vh - 28px)); } .product-config-modal__body { grid-template-columns: 1fr; } .product-config-modal__media { min-height: 180px; padding: 16px; } .product-config-modal__media img { max-height: 240px; } .product-config-modal__content { padding: 18px; } }
     </style>
 
-    <section class="shop-hero mb-4">
-        <div class="row g-4 align-items-center position-relative" style="z-index:2;">
-            <div class="col-lg-8">
-                <span class="hero-pill">Tienda oficial</span>
-                <h1 class="display-6 fw-bold mt-3 mb-2">Compra rapido, seguro y sin filas</h1>
-                <p class="mb-3 text-white-50">Explora el catalogo, agrega al carrito y finaliza tu pedido en minutos.</p>
-                <form method="GET" action="{{ route('shop.index') }}" class="hero-search d-flex gap-2">
-                    <input type="text" name="q" class="form-control border-0 shadow-none" placeholder="Buscar productos por nombre o categoria" value="{{ $search }}">
-                    <button class="btn btn-primary px-4" type="submit">Buscar</button>
+    <section class="shop-hero">
+        <svg class="shop-hero__mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="4" y="4" width="12" height="12" rx="4" fill="none" stroke="#fff" stroke-width=".6"/>
+            <rect x="16" y="4" width="12" height="12" rx="4" fill="none" stroke="#fff" stroke-width=".6"/>
+            <rect x="4" y="16" width="12" height="12" rx="4" fill="none" stroke="#fff" stroke-width=".6"/>
+            <rect x="16" y="16" width="12" height="12" rx="4" fill="none" stroke="#fff" stroke-width=".6"/>
+        </svg>
+        <div class="shop-hero__inner">
+            <div>
+                <div class="shop-hero__eyebrow">Compra verificada</div>
+                <h1>Todo lo que buscas, en un solo lugar</h1>
+                <p>Explora el catalogo disponible, agrega al carrito y finaliza tu pedido con confirmacion inmediata.</p>
+                <form method="GET" action="{{ route('shop.index') }}" class="shop-search">
+                    <input type="text" name="q" placeholder="Buscar productos por nombre o categoria" value="{{ $search }}">
+                    <button type="submit">Buscar</button>
                 </form>
             </div>
-            <div class="col-lg-4">
-                <div class="hero-benefits">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <div class="small text-white-50">Productos disponibles</div>
-                        <div class="fw-semibold">{{ number_format($products->total()) }}</div>
-                    </div>
-                    <div class="d-grid gap-2">
-                        <div class="hero-benefits__item">Pago rapido y seguro</div>
-                        <div class="hero-benefits__item">Confirmacion inmediata del pedido</div>
-                        <div class="hero-benefits__item">Compra en minutos desde cualquier dispositivo</div>
-                    </div>
-                </div>
+            <div class="shop-hero-panel">
+                <div class="shop-hero-panel__kicker">Ahora mismo</div>
+                <div class="shop-hero-panel__figure">{{ number_format($products->total()) }}</div>
+                <div class="shop-hero-panel__label">productos disponibles</div>
+                <hr>
+                <ul>
+                    <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pago rapido y seguro</li>
+                    <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Confirmacion inmediata</li>
+                    <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Compra desde cualquier dispositivo</li>
+                </ul>
             </div>
         </div>
     </section>
 
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h2 class="h5 mb-0">Catalogo destacado</h2>
-        <a href="{{ route('shop.cart') }}" class="btn btn-outline-secondary btn-sm shop-cart-cta d-inline-flex align-items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M3 4h2l2.4 10.2a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 7H7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="10" cy="19" r="1.5" fill="currentColor"/>
-                <circle cx="17" cy="19" r="1.5" fill="currentColor"/>
-            </svg>
-            <span>Ver carrito</span>
-        </a>
-    </div>
+    @if ($visibleCategories->isNotEmpty())
+        <section class="shop-discover" id="discover">
+            <h2>Explora por categoria</h2>
+            <div class="shop-discover__row">
+                @foreach ($visibleCategories->take(6) as $category)
+                    @php
+                        $tone = $palette[$loop->index % count($palette)];
+                    @endphp
+                    <button type="button" class="shop-discover__tile js-shop-filter" data-category="{{ \Illuminate\Support\Str::slug($category->name) }}">
+                        <span class="shop-discover__dot" style="background: {{ $tone['tint'] }}">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M6 2h9l6 6-11 11L2 11z" stroke="{{ $tone['tone'] }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="9" cy="7" r="1.4" fill="{{ $tone['tone'] }}"/>
+                            </svg>
+                        </span>
+                        <span>{{ $category->name }}</span>
+                    </button>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
-    <div class="row g-4">
-        @forelse ($products as $product)
-            @php
-                $variantOptions = $product->variants;
-                $hasVariantOptions = $variantOptions->isNotEmpty();
-                $modifierGroups = ($product->uses_component_groups || $isRestaurantCatalog)
-                    ? $product->modifierGroups->filter(fn ($group) => $group->options->isNotEmpty())->values()
-                    : collect();
-                $hasMenuCustomizer = $modifierGroups->isNotEmpty();
-                $defaultProductId = $hasVariantOptions
-                    ? $variantOptions->first()->id
-                    : $product->id;
-                $minVariantPrice = $hasVariantOptions ? (float) $variantOptions->min('sale_price') : null;
-                $kitComponents = $product->product_type === \App\Models\Product::TYPE_KIT
-                    ? $product->kitItems
-                        ->map(function ($item) {
-                            $name = $item->componentProduct?->name;
-                            if (! $name) {
-                                return null;
-                            }
-                            return [
-                                'name' => $name,
-                                'quantity' => (float) $item->quantity,
-                            ];
-                        })
-                        ->filter()
-                        ->values()
-                    : collect();
-            @endphp
-            <div class="col-12 col-md-6 col-xl-3">
-                <div class="product-card-modern h-100 bg-white">
-                    <img
-                        src="{{ $product->image_url ?: asset('images/product-placeholder.svg') }}"
-                        alt="{{ $product->name }}"
-                        class="product-img-modern"
-                    >
-                    <div class="card-body d-flex flex-column">
-                        <h2 class="h6 mb-1">{{ $product->name }}</h2>
+    <nav class="shop-categories" aria-label="Filtros de categoria">
+        <button type="button" class="shop-chip is-active js-shop-filter" data-category="all">Todos</button>
+        @foreach ($visibleCategories as $category)
+            <button type="button" class="shop-chip js-shop-filter" data-category="{{ \Illuminate\Support\Str::slug($category->name) }}">{{ $category->name }}</button>
+        @endforeach
+    </nav>
+
+    <main class="shop-catalog">
+        <div class="shop-catalog__head">
+            <h2>Catalogo destacado</h2>
+            <span id="shop-result-count">{{ $products->total() }} {{ $products->total() === 1 ? 'producto' : 'productos' }}</span>
+        </div>
+
+        <div class="shop-grid" id="shop-product-grid">
+            @forelse ($products as $product)
+                @php
+                    $variantOptions = $product->variants;
+                    $hasVariantOptions = $variantOptions->isNotEmpty();
+                    $modifierGroups = ($product->uses_component_groups || $isRestaurantCatalog)
+                        ? $product->modifierGroups->filter(fn ($group) => $group->options->isNotEmpty())->values()
+                        : collect();
+                    $hasMenuCustomizer = $modifierGroups->isNotEmpty();
+                    $defaultProductId = $hasVariantOptions ? $variantOptions->first()->id : $product->id;
+                    $minVariantPrice = $hasVariantOptions ? (float) $variantOptions->min('sale_price') : null;
+                    $kitComponents = $product->product_type === \App\Models\Product::TYPE_KIT
+                        ? $product->kitItems
+                            ->map(function ($item) {
+                                $name = $item->componentProduct?->name;
+                                return $name ? ['name' => $name, 'quantity' => (float) $item->quantity] : null;
+                            })
+                            ->filter()
+                            ->values()
+                        : collect();
+                    $tone = $palette[$loop->index % count($palette)];
+                    $imageUrl = $product->image_url;
+                    $categorySlug = $product->category ? \Illuminate\Support\Str::slug($product->category->name) : 'sin-categoria';
+                @endphp
+
+                <article class="shop-product" data-category="{{ $categorySlug }}" data-name="{{ \Illuminate\Support\Str::lower($product->name) }}">
+                    <div class="shop-product__media" style="background: {{ $tone['tint'] }}">
+                        @if ($product->image_url)
+                            <button type="button" class="product-image-trigger" data-product-image="{{ $imageUrl }}" data-product-name="{{ $product->name }}" aria-label="Ver imagen de {{ $product->name }}">
+                                <img src="{{ $imageUrl }}" alt="{{ $product->name }}" class="shop-product__image">
+                                <span class="shop-product__image-label">Ver imagen</span>
+                            </button>
+                        @else
+                            <span class="shop-product__initial" style="color: {{ $tone['tone'] }}">{{ \Illuminate\Support\Str::substr($product->name, 0, 1) }}</span>
+                        @endif
+                        <span class="shop-stock-tag">En stock</span>
+                    </div>
+
+                    <h3>{{ $product->name }}</h3>
+                    <div class="shop-product__category">{{ $product->category?->name }}</div>
+                    <div class="shop-product__badges">
                         @if ($product->product_type === \App\Models\Product::TYPE_KIT)
-                            <span class="product-kind-badge product-kind-badge--kit">Kit</span>
+                            <span class="shop-product-badge">Kit</span>
                         @elseif ($product->product_type === \App\Models\Product::TYPE_VARIANT)
-                            <span class="product-kind-badge product-kind-badge--variant">Variante</span>
+                            <span class="shop-product-badge">Variante</span>
                         @endif
-                        @if ($product->category)
-                            <div class="text-muted small">{{ $product->category->name }}</div>
-                        @endif
+                    </div>
+                    <div class="shop-product__meta">
                         @if ($hasVariantOptions)
-                            <div class="product-kind-meta">Selecciona talla o presentacion antes de agregar.</div>
+                            Selecciona talla o presentacion antes de agregar.
                         @elseif ($product->product_type === \App\Models\Product::TYPE_KIT)
-                            <div class="product-kind-meta">
-                                @if ($kitComponents->isNotEmpty())
-                                    Este kit incluye:
+                            Revisa lo que incluye y elige tus opciones antes de agregar.
+                        @endif
+                    </div>
+
+                    <span class="shop-price">
+                        @if ($hasVariantOptions)
+                            Desde ${{ number_format($minVariantPrice, 2) }}
+                        @else
+                            ${{ number_format((float) $product->sale_price, 2) }}
+                        @endif
+                    </span>
+
+                    @if ($hasMenuCustomizer || $hasVariantOptions || $product->product_type === \App\Models\Product::TYPE_KIT)
+                        <div class="shop-configurator">
+                            <button type="button" class="shop-configurator__trigger" data-config-modal-open="product-config-modal-{{ $product->id }}">
+                                Agregar
+                            </button>
+
+                            <div id="product-config-modal-{{ $product->id }}" class="product-config-modal" aria-hidden="true">
+                                <div class="product-config-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="product-config-title-{{ $product->id }}">
+                                    <div class="product-config-modal__header">
+                                        <h2 id="product-config-title-{{ $product->id }}" class="product-config-modal__title">{{ $product->name }}</h2>
+                                        <button type="button" class="shop-modal-close" data-config-modal-close aria-label="Cerrar modal" title="Cerrar">&times;</button>
+                                    </div>
+                                    <div class="product-config-modal__body">
+                                        <div class="product-config-modal__media">
+                                            @if ($product->image_url)
+                                                <img src="{{ $imageUrl }}" alt="{{ $product->name }}">
+                                            @else
+                                                <span class="product-config-modal__initial">{{ \Illuminate\Support\Str::substr($product->name, 0, 1) }}</span>
+                                            @endif
+                                        </div>
+                                        <div class="product-config-modal__content">
+                                            <div class="shop-configurator__body">
+                                @if ($product->product_type === \App\Models\Product::TYPE_KIT && $kitComponents->isNotEmpty())
+                                    <div class="shop-configurator__title">Este kit incluye</div>
                                     <ul class="kit-components-list">
                                         @foreach ($kitComponents as $component)
                                             <li>{{ rtrim(rtrim(number_format($component['quantity'], 3, '.', ''), '0'), '.') }} x {{ $component['name'] }}</li>
                                         @endforeach
                                     </ul>
-                                @elseif ($product->uses_component_groups)
-                                    Este kit se configura seleccionando sus componentes.
-                                @else
-                                    Este kit no tiene componentes configurados.
                                 @endif
-                            </div>
-                        @endif
-                        <div class="mt-3">
-                            <span class="price-tag">
-                                @if ($hasVariantOptions)
-                                    Desde ${{ number_format($minVariantPrice, 2) }}
-                                @else
-                                    ${{ number_format((float) $product->sale_price, 2) }}
-                                @endif
-                            </span>
-                        </div>
 
-                        @if ($hasMenuCustomizer)
-                            <details class="restaurant-configurator">
-                                <summary>
-                                    <span class="restaurant-configurator__summary-copy">
-                                        <span class="restaurant-configurator__summary-title">Configurar producto</span>
-                                        <span class="restaurant-configurator__label">{{ $modifierGroups->count() }} grupos disponibles</span>
-                                    </span>
-                                </summary>
-
-                                <form method="POST" action="{{ route('shop.cart.add') }}" class="mt-3 d-flex flex-column gap-3">
+                                <form method="POST" action="{{ route('shop.cart.add') }}" class="shop-product__form d-flex flex-column gap-3">
                                     @csrf
-                                    @if ($hasVariantOptions)
-                                        <div>
-                                            <div class="restaurant-configurator__title">Presentacion</div>
-                                            <div class="variant-choice-grid">
-                                                @foreach ($variantOptions as $variant)
-                                                    @php
-                                                        $variantLabel = $variant->name;
-                                                        if (preg_match('/talla\s+([a-z0-9]+)/i', $variant->name, $matches)) {
-                                                            $variantLabel = strtoupper($matches[1]);
-                                                        }
-                                                    @endphp
-                                                    <input
-                                                        class="variant-choice-input"
-                                                        type="radio"
-                                                        id="variant-{{ $product->id }}-{{ $variant->id }}"
-                                                        name="product_id"
-                                                        value="{{ $variant->id }}"
-                                                        @checked((int) $variant->id === (int) $defaultProductId)
-                                                    >
-                                                    <label class="variant-choice-label" for="variant-{{ $product->id }}-{{ $variant->id }}">
-                                                        {{ $variantLabel }}
-                                                    </label>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @else
-                                        <input type="hidden" name="product_id" value="{{ $defaultProductId }}">
-                                    @endif
+                                    @include('ecommerce.partials.product-variant-options', ['variantOptions' => $variantOptions, 'product' => $product, 'defaultProductId' => $defaultProductId, 'hasVariantOptions' => $hasVariantOptions])
 
                                     @foreach ($modifierGroups as $group)
                                         @php
@@ -548,14 +285,14 @@
                                             $inputType = $isSingle ? 'radio' : 'checkbox';
                                             $inputName = $isSingle ? "modifier_groups[{$group->id}]" : "modifier_groups[{$group->id}][]";
                                         @endphp
-                                        <div class="restaurant-configurator__group">
-                                            <div class="restaurant-configurator__title">
+                                        <div class="shop-configurator__group">
+                                            <div class="shop-configurator__title">
                                                 {{ $group->name }}
                                                 @if ($group->is_required)
                                                     <span class="text-danger">*</span>
                                                 @endif
                                             </div>
-                                            <div class="restaurant-configurator__hint">
+                                            <div class="shop-configurator__hint">
                                                 @if ($isRemove)
                                                     Marca lo que no quieres en el plato.
                                                 @elseif ($isSingle)
@@ -566,22 +303,15 @@
                                                     Puedes elegir varias opciones.
                                                 @endif
                                             </div>
-                                            <div class="restaurant-configurator__options">
+                                            <div class="shop-configurator__options">
                                                 @foreach ($group->options as $option)
-                                                    <div class="restaurant-configurator__option">
+                                                    <div class="shop-configurator__option">
                                                         <label for="modifier-{{ $product->id }}-{{ $group->id }}-{{ $option->id }}">
-                                                                <input
-                                                                    id="modifier-{{ $product->id }}-{{ $group->id }}-{{ $option->id }}"
-                                                                    type="{{ $inputType }}"
-                                                                    name="{{ $inputName }}"
-                                                                    value="{{ $option->id }}"
-                                                                    @checked(! $isRemove && $option->is_default)
-                                                                    @required($group->is_required && $isSingle)
-                                                                >
+                                                            <input id="modifier-{{ $product->id }}-{{ $group->id }}-{{ $option->id }}" type="{{ $inputType }}" name="{{ $inputName }}" value="{{ $option->id }}" @checked(! $isRemove && $option->is_default) @required($group->is_required && $isSingle)>
                                                             <span>{{ $isRemove ? 'Sin '.$option->label : $option->label }}</span>
                                                         </label>
                                                         @if (! $isRemove && (float) $option->price_delta > 0)
-                                                            <span class="restaurant-configurator__price">+ ${{ number_format((float) $option->price_delta, 2) }}</span>
+                                                            <span class="shop-configurator__price">+ ${{ number_format((float) $option->price_delta, 2) }}</span>
                                                         @endif
                                                     </div>
                                                 @endforeach
@@ -589,59 +319,180 @@
                                         </div>
                                     @endforeach
 
-                                    <div class="d-flex gap-2 align-items-center">
-                                        <input type="number" min="1" max="999" name="quantity" value="1" class="form-control form-control-sm" style="max-width: 88px;">
-                                        <button type="submit" class="btn btn-primary btn-sm w-100">Agregar al carrito</button>
+                                    <div class="shop-product__buy-row">
+                                        <input type="number" min="1" max="999" name="quantity" value="1" class="shop-product__qty" aria-label="Cantidad">
+                                        <button type="submit" class="shop-product__add">Agregar al carrito</button>
                                     </div>
                                 </form>
-                            </details>
-                        @else
-                            <form method="POST" action="{{ route('shop.cart.add') }}" class="mt-auto pt-3 d-flex flex-column gap-2 h-100">
-                                @csrf
-                                @if ($hasVariantOptions)
-                                    <div class="w-100">
-                                        <div class="variant-choice-grid">
-                                        @foreach ($variantOptions as $variant)
-                                            @php
-                                                $variantLabel = $variant->name;
-                                                if (preg_match('/talla\s+([a-z0-9]+)/i', $variant->name, $matches)) {
-                                                    $variantLabel = strtoupper($matches[1]);
-                                                }
-                                            @endphp
-                                            <input
-                                                class="variant-choice-input"
-                                                type="radio"
-                                                id="variant-{{ $product->id }}-{{ $variant->id }}"
-                                                name="product_id"
-                                                value="{{ $variant->id }}"
-                                                @checked((int) $variant->id === (int) $defaultProductId)
-                                            >
-                                            <label class="variant-choice-label" for="variant-{{ $product->id }}-{{ $variant->id }}">
-                                                {{ $variantLabel }}
-                                            </label>
-                                        @endforeach
+                                            </div>
                                         </div>
                                     </div>
-                                @else
-                                    <input type="hidden" name="product_id" value="{{ $defaultProductId }}">
-                                @endif
-                                <div class="d-flex gap-2 align-items-center mt-auto">
-                                    <input type="number" min="1" max="999" name="quantity" value="1" class="form-control form-control-sm" style="max-width: 88px;">
-                                    <button type="submit" class="btn btn-primary btn-sm w-100">Agregar</button>
                                 </div>
-                            </form>
-                        @endif
-                    </div>
+                            </div>
+                        </div>
+                    @else
+                        <form method="POST" action="{{ route('shop.cart.add') }}" class="shop-product__form">
+                            @csrf
+                            <input type="hidden" name="product_id" value="{{ $defaultProductId }}">
+                            <div class="shop-product__buy-row">
+                                <input type="number" min="1" max="999" name="quantity" value="1" class="shop-product__qty" aria-label="Cantidad">
+                                <button type="submit" class="shop-product__add">Agregar</button>
+                            </div>
+                        </form>
+                    @endif
+                </article>
+            @empty
+                <div class="shop-empty">No hay productos para mostrar.</div>
+            @endforelse
+        </div>
+
+        <div class="mt-4">
+            {{ $products->links() }}
+        </div>
+    </main>
+
+    <section class="shop-story">
+        <h2>Compra con tranquilidad, de principio a fin</h2>
+        <div class="shop-story__list">
+            <div class="shop-story__item">
+                <span class="shop-story__num">01</span>
+                <div>
+                    <h3>Encuentra lo que necesitas</h3>
+                    <p>Explora el catalogo por categorias, revisa las opciones de cada producto y agrega solo lo que buscas.</p>
                 </div>
             </div>
-        @empty
-            <div class="col-12">
-                <div class="alert alert-secondary mb-0">No hay productos para mostrar.</div>
+            <div class="shop-story__item">
+                <span class="shop-story__num">02</span>
+                <div>
+                    <h3>Tu pedido, a tu ritmo</h3>
+                    <p>Elige cantidades, variantes o componentes antes de llevar cada producto al carrito.</p>
+                </div>
             </div>
-        @endforelse
+            <div class="shop-story__item">
+                <span class="shop-story__num">03</span>
+                <div>
+                    <h3>Confirmacion clara</h3>
+                    <p>Finaliza tu compra y consulta el estado de tus pedidos desde tu cuenta cuando lo necesites.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div id="product-image-modal" class="product-image-modal" aria-hidden="true">
+        <div class="product-image-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="product-image-modal-title">
+            <div class="product-image-modal__header">
+                <h2 id="product-image-modal-title" class="product-image-modal__title">Imagen del producto</h2>
+                <button type="button" class="shop-modal-close" id="close-product-image-modal" aria-label="Cerrar modal" title="Cerrar">&times;</button>
+            </div>
+            <div class="product-image-modal__body">
+                <img id="product-image-modal-img" class="product-image-modal__img" src="" alt="">
+            </div>
+        </div>
     </div>
 
-    <div class="mt-3">
-        {{ $products->links() }}
-    </div>
+    <script>
+        (function () {
+            const modal = document.getElementById('product-image-modal');
+            const modalImage = document.getElementById('product-image-modal-img');
+            const modalTitle = document.getElementById('product-image-modal-title');
+            const closeButton = document.getElementById('close-product-image-modal');
+            const filters = document.querySelectorAll('.js-shop-filter');
+            const chips = document.querySelectorAll('.shop-chip');
+            const cards = document.querySelectorAll('.shop-product');
+            const resultCount = document.getElementById('shop-result-count');
+            const configModals = document.querySelectorAll('.product-config-modal');
+
+            function productLabel(count) {
+                return count + (count === 1 ? ' producto' : ' productos');
+            }
+
+            filters.forEach(filter => {
+                filter.addEventListener('click', function () {
+                    const category = filter.dataset.category || 'all';
+                    let visible = 0;
+                    cards.forEach(card => {
+                        const match = category === 'all' || card.dataset.category === category;
+                        card.hidden = !match;
+                        if (match) {
+                            visible++;
+                        }
+                    });
+                    if (resultCount) {
+                        resultCount.textContent = productLabel(visible);
+                    }
+                    chips.forEach(chip => {
+                        chip.classList.toggle('is-active', chip.dataset.category === category);
+                    });
+                });
+            });
+
+            function closeModal() {
+                if (!modal || !modalImage) {
+                    return;
+                }
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+                modalImage.src = '';
+                modalImage.alt = '';
+            }
+
+            if (modal && modalImage && modalTitle && closeButton) {
+                document.querySelectorAll('.product-image-trigger').forEach(button => {
+                    button.addEventListener('click', function (event) {
+                        event.preventDefault();
+                        const imageUrl = button.dataset.productImage || '';
+                        const productName = button.dataset.productName || 'Producto';
+                        modalImage.src = imageUrl;
+                        modalImage.alt = productName;
+                        modalTitle.textContent = productName;
+                        modal.classList.add('is-open');
+                        modal.setAttribute('aria-hidden', 'false');
+                        closeButton.focus();
+                    });
+                });
+
+                closeButton.addEventListener('click', closeModal);
+                modal.addEventListener('click', function (event) {
+                    if (event.target === modal) {
+                        closeModal();
+                    }
+                });
+            }
+
+            function closeConfigModal(configModal) {
+                configModal.classList.remove('is-open');
+                configModal.setAttribute('aria-hidden', 'true');
+            }
+
+            document.querySelectorAll('[data-config-modal-open]').forEach(button => {
+                button.addEventListener('click', function () {
+                    const configModal = document.getElementById(button.dataset.configModalOpen);
+                    if (!configModal) {
+                        return;
+                    }
+                    configModal.classList.add('is-open');
+                    configModal.setAttribute('aria-hidden', 'false');
+                    configModal.querySelector('[data-config-modal-close]')?.focus();
+                });
+            });
+
+            configModals.forEach(configModal => {
+                configModal.querySelector('[data-config-modal-close]')?.addEventListener('click', () => closeConfigModal(configModal));
+                configModal.addEventListener('click', function (event) {
+                    if (event.target === configModal) {
+                        closeConfigModal(configModal);
+                    }
+                });
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && modal?.classList.contains('is-open')) {
+                    closeModal();
+                }
+                if (event.key === 'Escape') {
+                    configModals.forEach(closeConfigModal);
+                }
+            });
+        })();
+    </script>
 @endsection

@@ -72,6 +72,9 @@ Route::middleware(['auth', 'admin.user', 'active.subscription'])->group(function
     Route::resource('branches', BranchController::class)
         ->except(['show', 'destroy'])
         ->middleware('permission:manage_branches');
+    Route::post('products/variant-attributes', [ProductController::class, 'storeVariantAttribute'])
+        ->name('products.variant-attributes.store')
+        ->middleware('permission:manage_products');
     Route::resource('products', ProductController::class)->middleware('permission:manage_products');
     Route::resource('customers', CustomerController::class)->middleware('permission:manage_customers');
 

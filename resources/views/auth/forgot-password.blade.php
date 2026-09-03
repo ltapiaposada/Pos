@@ -1,30 +1,9 @@
-<x-guest-layout>
-    <div class="mb-6">
-        <h1 class="text-xl font-semibold tracking-tight text-base-content">Recuperar acceso</h1>
-        <p class="mt-1 text-sm text-base-content/60">Te enviaremos un enlace para restablecer tu contrasena.</p>
-    </div>
-
-    <div class="mb-4 text-sm text-base-content/70">
-        Ingresa tu correo y te enviaremos un enlace para crear una nueva contrasena.
-    </div>
-
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-
-    <form method="POST" action="{{ route('password.email') }}" class="space-y-4">
+<x-auth-shell title="Recupera tu acceso" subtitle="Te enviaremos un enlace para restablecer tu contrasena.">
+    <form method="POST" action="{{ route('password.email') }}">
         @csrf
-
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" value="Correo electronico" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end">
-            <x-primary-button>
-                Enviar enlace de recuperacion
-            </x-primary-button>
-        </div>
+        <div class="auth-field"><label for="email">Correo electronico</label><div class="auth-input-wrap"><input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="tucorreo@ejemplo.com" required autofocus autocomplete="username"></div>@error('email') <div class="auth-error">{{ $message }}</div> @enderror</div>
+        <button type="submit" class="auth-submit">Enviar enlace de recuperacion</button>
     </form>
-</x-guest-layout>
+    <div class="auth-divider"><span>o</span></div>
+    <div class="auth-footer-link">Recordaste tu contrasena? <a href="{{ route('login') }}" class="auth-link">Inicia sesion</a></div>
+</x-auth-shell>

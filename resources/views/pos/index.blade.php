@@ -141,15 +141,45 @@
                     </div>
                     <div x-show="showProducts" x-cloak class="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                         <template x-for="product in products" :key="product.id">
-                            <button type="button" @click="addToCart(product)" class="card h-full border border-base-200 hover:border-primary/60 transition">
+                            <button type="button" @click="handleProductClick(product)" class="card h-full border border-base-200 hover:border-primary/60 transition">
                                 <div class="card-body p-4 text-left">
                                     <div class="text-sm font-semibold" x-text="product.name"></div>
                                     <div class="text-xs text-base-content/60" x-text="product.sku"></div>
                                     <div class="mt-1 text-[11px] text-base-content/60">
-                                        <span x-show="!product.uses_component_groups">Disponible: <span x-text="toAmount(product.available_stock).toFixed(3)"></span></span>
+                                        <span x-show="product.has_variants">Selecciona variante</span>
+                                        <span x-show="!product.has_variants && !product.uses_component_groups">Disponible: <span x-text="toAmount(product.available_stock).toFixed(3)"></span></span>
                                         <span x-show="product.uses_component_groups">Componentes configurables</span>
                                     </div>
                                     <div class="mt-2 text-sm font-semibold text-primary">$<span x-text="product.sale_price"></span></div>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                x-show="selectedVariantProduct"
+                x-cloak
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+                @keydown.escape.window="selectedVariantProduct = null"
+            >
+                <div class="w-full max-w-lg rounded-xl bg-base-100 p-4 shadow-xl">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold" x-text="selectedVariantProduct?.name || 'Seleccionar variante'"></h2>
+                            <p class="mt-1 text-xs text-base-content/60">Elige la talla/color exacto que vas a vender.</p>
+                        </div>
+                        <button type="button" class="btn btn-outline btn-sm" @click="selectedVariantProduct = null">Cerrar</button>
+                    </div>
+                    <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                        <template x-for="variant in selectedVariantProduct?.variants || []" :key="variant.id">
+                            <button type="button" class="rounded-xl border border-base-200 p-3 text-left hover:border-primary" @click="selectVariant(variant)">
+                                <div class="text-sm font-semibold" x-text="variantLabel(variant)"></div>
+                                <div class="text-xs text-base-content/60" x-text="variant.sku"></div>
+                                <div class="mt-1 flex items-center justify-between text-xs">
+                                    <span>Stock: <span x-text="toAmount(variant.available_stock).toFixed(3)"></span></span>
+                                    <span class="font-semibold text-primary">$<span x-text="Number(variant.sale_price).toFixed(2)"></span></span>
                                 </div>
                             </button>
                         </template>
@@ -530,6 +560,7 @@
                 minCustomerChars: 1,
                 search: '',
                 products: [],
+                selectedVariantProduct: null,
                 cart: Array.isArray(oldPosState.items) ? oldPosState.items : [],
                 globalDiscount: Number(oldPosState.global_discount || 0),
                 paymentCash: Number((oldPosState.payments || []).find(p => p.method === 'cash')?.amount || 0),
@@ -1011,6 +1042,40 @@
                 },
                 changeBranch() {
                     window.location = `{{ route('pos.index') }}?branch_id=${this.branchId}`;
+                },
+                handleProductClick(product) {
+                    if (product.has_variants && Array.isArray(product.variants) && product.variants.length > 0) {
+                        this.selectedVariantProduct = product;
+                        return;
+                    }
+
+                    this.addToCart(product);
+                },
+                variantLabel(variant) {
+                    const attributes = variant.attributes || {};
+                    const parts = Object.entries(attributes)
+                        .map(([attribute, value]) => `${attribute}: ${value}`);
+
+                    return parts.length > 0 ? parts.join(' / ') : variant.name;
+                },
+                selectVariant(variant) {
+                    this.addToCart({
+                        id: variant.id,
+                        name: variant.name,
+                        sku: variant.sku,
+                        barcode: variant.barcode,
+                        sale_price: variant.sale_price,
+                        tax_rate: variant.tax_rate,
+                        available_stock: variant.available_stock,
+                        tracks_inventory: variant.tracks_inventory,
+                        product_type: variant.product_type || 'variant',
+                        uses_component_groups: false,
+                        modifier_groups: [],
+                    });
+                    this.selectedVariantProduct = null;
+                    if (this.isMobileViewport) {
+                        this.mobileSection = 'cart';
+                    }
                 },
                 addToCart(product) {
                     const existing = this.cart.find(item => item.product_id === product.id);

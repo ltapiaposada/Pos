@@ -1,53 +1,22 @@
-<x-guest-layout>
-    <div class="mb-6">
-        <h1 class="text-xl font-semibold tracking-tight text-base-content">Iniciar</h1>
-        <p class="mt-1 text-sm text-base-content/60">Ingresa tus credenciales para acceder.</p>
-    </div>
-
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-
-    <form method="POST" action="{{ route('login') }}" class="space-y-4">
+<x-auth-shell title="Inicia sesion" subtitle="Ingresa tus credenciales para continuar.">
+    <form method="POST" action="{{ route('login') }}">
         @csrf
-
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" value="Correo electrónico" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+        <div class="auth-field">
+            <label for="email">Correo electronico</label>
+            <div class="auth-input-wrap"><input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="tucorreo@ejemplo.com" required autofocus autocomplete="username"></div>
+            @error('email') <div class="auth-error">{{ $message }}</div> @enderror
         </div>
-
-        <!-- Password -->
-        <div>
-            <x-input-label for="password" value="Contraseña" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        <div class="auth-field">
+            <label for="password">Contrasena</label>
+            <div class="auth-input-wrap"><input id="password" class="auth-password" type="password" name="password" placeholder="••••••••" required autocomplete="current-password"><button type="button" class="auth-toggle" data-auth-toggle="password" aria-label="Mostrar contrasena">Mostrar</button></div>
+            @error('password') <div class="auth-error">{{ $message }}</div> @enderror
         </div>
-
-        <!-- Remember Me -->
-        <div class="block">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="checkbox checkbox-primary" name="remember">
-                <span class="ms-2 text-sm text-base-content/70">Recordarme</span>
-            </label>
+        <div class="auth-options">
+            <label class="auth-remember" for="remember"><input id="remember" type="checkbox" name="remember" @checked(old('remember'))>Recordarme</label>
+            @if (Route::has('password.request'))<a href="{{ route('password.request') }}" class="auth-link">Olvidaste tu contrasena?</a>@endif
         </div>
-
-        <div class="flex items-center justify-end gap-3">
-            <a class="underline text-sm text-base-content/70 hover:text-base-content rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/40" href="{{ route('register') }}">
-                Crear cuenta
-            </a>
-            @if (Route::has('password.request'))
-                <a class="underline text-sm text-base-content/70 hover:text-base-content rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/40" href="{{ route('password.request') }}">
-                    ¿Olvidaste tu contraseña?
-                </a>
-            @endif
-
-            <x-primary-button class="ms-3">Iniciar</x-primary-button>
-        </div>
+        <button type="submit" class="auth-submit">Iniciar sesion</button>
     </form>
-</x-guest-layout>
+    <div class="auth-divider"><span>o</span></div>
+    <div class="auth-footer-link">No tienes cuenta? <a href="{{ route('register') }}" class="auth-link">Registrate gratis</a></div>
+</x-auth-shell>
