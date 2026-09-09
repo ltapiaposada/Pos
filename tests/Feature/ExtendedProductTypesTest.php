@@ -418,7 +418,7 @@ class ExtendedProductTypesTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->firstOrFail();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
         $this->actingAs($user);
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
@@ -514,7 +514,7 @@ class ExtendedProductTypesTest extends TestCase
 
         $this->post(route('pos.checkout'), [
             'branch_id' => $cashier->branch_id,
-            'customer_id' => Customer::where('document', 'CF')->value('id'),
+            'customer_id' => Customer::where('document', '222222222222')->value('id'),
             'items' => [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 150]],
             'payments' => [['method' => 'cash', 'amount' => 150]],
         ])->assertRedirect();
@@ -566,7 +566,7 @@ class ExtendedProductTypesTest extends TestCase
         $this->actingAs($cashier);
         $this->post(route('pos.checkout'), [
             'branch_id' => $cashier->branch_id,
-            'customer_id' => Customer::where('document', 'CF')->value('id'),
+            'customer_id' => Customer::where('document', '222222222222')->value('id'),
             'items' => [['product_id' => $product->id, 'quantity' => 2, 'unit_price' => 10]],
             'payments' => [['method' => 'cash', 'amount' => 20]],
         ])->assertRedirect();

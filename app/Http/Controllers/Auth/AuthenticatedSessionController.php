@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Services\SubscriptionAccessService;
+use App\Services\CompanyKickoffService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,9 +13,10 @@ use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
 {
-    public function __construct(private readonly SubscriptionAccessService $subscriptionAccessService)
-    {
-    }
+    public function __construct(
+        private readonly SubscriptionAccessService $subscriptionAccessService,
+        private readonly CompanyKickoffService $companyKickoffService,
+    ) {}
 
     /**
      * Display the login view.
@@ -37,6 +39,10 @@ class AuthenticatedSessionController extends Controller
         $request->session()->forget(['active_subscription_id', 'active_subscription_plan_type']);
 
         $user = $request->user();
+
+        if ($user->company) {
+            $this->companyKickoffService->runIfPending($user->company);
+        }
 
         if (! $user->hasRole('customer') && $this->subscriptionAccessService->hasMultiplePaidActivePlanContexts($user->company)) {
             return redirect()->route('subscription-context.index');

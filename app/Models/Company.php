@@ -22,6 +22,11 @@ class Company extends Model
         'address',
         'company_type_id',
         'status',
+        'kickoff_completed',
+    ];
+
+    protected $casts = [
+        'kickoff_completed' => 'boolean',
     ];
 
     public function companyType()

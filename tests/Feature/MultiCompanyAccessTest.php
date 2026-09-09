@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\CompanySubscription;
 use App\Models\CompanyType;
 use App\Models\Customer;
+use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\ProductModifierGroup;
 use App\Models\ProductModifierOption;
@@ -20,6 +21,82 @@ use Tests\TestCase;
 class MultiCompanyAccessTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_admin_can_edit_update_and_delete_a_product_without_breaking_dashboard_stock_alerts(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        [$company, $branch] = $this->makeCompanyContext('pos', 'Empresa productos');
+        $admin = $this->makeUser($company, $branch, 'admin@product-actions.test', 'admin');
+
+        CompanySubscription::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'plan_type' => 'pos',
+            'billing_period' => 'monthly',
+            'start_date' => now()->subDay()->toDateString(),
+            'end_date' => now()->addMonth()->toDateString(),
+            'status' => CompanySubscription::STATUS_ACTIVE,
+            'payment_status' => CompanySubscription::PAYMENT_STATUS_PAID,
+        ]);
+
+        $product = Product::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'name' => 'Producto original',
+            'sku' => 'PRODUCT-ACTIONS-001',
+            'unit' => 'und',
+            'product_type' => Product::TYPE_SIMPLE,
+            'cost_price' => 5,
+            'sale_price' => 10,
+            'is_active' => true,
+            'is_visible_ecommerce' => false,
+        ]);
+
+        Inventory::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'branch_id' => $branch->id,
+            'product_id' => $product->id,
+            'stock' => 1,
+            'min_stock' => 5,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('products.edit', $product))
+            ->assertOk()
+            ->assertSee('Producto original');
+
+        $this->actingAs($admin)
+            ->put(route('products.update', $product), [
+                'name' => 'Producto actualizado',
+                'sku' => $product->sku,
+                'barcode' => '',
+                'image_url' => '',
+                'description' => '',
+                'delivery_instructions' => '',
+                'category_id' => '',
+                'tax_id' => '',
+                'unit' => $product->unit,
+                'product_type' => Product::TYPE_SIMPLE,
+                'parent_product_id' => '',
+                'cost_price' => 6,
+                'sale_price' => 12,
+                'is_active' => 1,
+                'is_visible_ecommerce' => 0,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('products.index'));
+
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'name' => 'Producto actualizado',
+            'sale_price' => 12,
+        ]);
+
+        $this->actingAs($admin)
+            ->delete(route('products.destroy', $product))
+            ->assertRedirect(route('products.index'));
+
+        $this->assertSoftDeleted('products', ['id' => $product->id]);
+        $this->actingAs($admin)->get(route('dashboard'))->assertOk();
+    }
 
     public function test_system_owner_can_access_global_company_panel(): void
     {

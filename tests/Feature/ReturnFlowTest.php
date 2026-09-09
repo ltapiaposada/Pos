@@ -23,7 +23,7 @@ class ReturnFlowTest extends TestCase
 
         $cashier = User::where('email', 'cashier@pos.test')->first();
         $supervisor = User::where('email', 'supervisor@pos.test')->first();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $cashier->branch_id,
@@ -119,7 +119,7 @@ class ReturnFlowTest extends TestCase
 
         $cashier = User::where('email', 'cashier@pos.test')->first();
         $supervisor = User::where('email', 'supervisor@pos.test')->first();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $cashier->branch_id,

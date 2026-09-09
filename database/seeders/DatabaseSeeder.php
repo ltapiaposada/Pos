@@ -17,9 +17,6 @@ class DatabaseSeeder extends Seeder
     {
         $seeders = [
             KickoffSeeder::class,
-            TaxSeeder::class,
-            SettingsSeeder::class,
-            AccountingSeeder::class,
         ];
 
         if ($this->shouldSeedDemoData()) {

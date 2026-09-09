@@ -545,7 +545,7 @@
                         .filter(item => String(item.product_id) === String(product.id))
                         .reduce((carry, item) => carry + this.toAmount(item.quantity), 0);
                     if (this.toAmount(product.available_stock) > 0 && (usedQuantity + 1) > this.toAmount(product.available_stock)) {
-                        alert('No puedes vender una cantidad superior al stock disponible.');
+                        window.showSystemAlert('No puedes vender una cantidad superior al stock disponible.', { type: 'warning' });
                         return;
                     }
 
@@ -658,26 +658,26 @@
                     const nonCredit = this.toAmount(this.paymentCash) + this.toAmount(this.paymentCard) + this.toAmount(this.paymentTransfer);
                     return Math.max(0, nonCredit - this.total);
                 },
-                submitCheckout() {
-                    if (!window.confirm('¿Deseas convertir este pedido en una venta? Esta acción cerrará el pedido.')) {
+                async submitCheckout() {
+                    if (!await window.showSystemConfirm('¿Deseas convertir este pedido en una venta? Esta acción cerrará el pedido.', { confirmText: 'Convertir en venta' })) {
                         return;
                     }
 
                     const payments = JSON.parse(this.paymentsPayload);
                     if (this.hasCartStockOverflow()) {
-                        alert('Hay productos con cantidad superior al stock disponible.');
+                        window.showSystemAlert('Hay productos con cantidad superior al stock disponible.', { type: 'warning' });
                         return;
                     }
                     if (payments.length === 0) {
-                        alert('Debes registrar al menos un pago.');
+                        window.showSystemAlert('Debes registrar al menos un pago.', { type: 'warning' });
                         return;
                     }
                     if (this.coveredTotal + 0.0001 < this.total) {
-                        alert('El pago mas credito es insuficiente.');
+                        window.showSystemAlert('El pago más crédito es insuficiente.', { type: 'warning' });
                         return;
                     }
                     if (this.coveredTotal > this.total + 0.0001) {
-                        alert('El pago mas credito no puede superar el total.');
+                        window.showSystemAlert('El pago más crédito no puede superar el total.', { type: 'warning' });
                         return;
                     }
                     this.$refs.checkoutForm.submit();

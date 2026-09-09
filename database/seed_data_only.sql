@@ -41,7 +41,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `customers` WRITE;
 /*!40000 ALTER TABLE `customers` DISABLE KEYS */;
-INSERT INTO `customers` (`id`, `company_id`, `user_id`, `name`, `document`, `email`, `phone`, `address`, `contact_type`, `is_active`, `created_at`, `updated_at`, `deleted_at`) VALUES (1,1,NULL,'Cliente Mostrador','CF',NULL,NULL,NULL,'person',1,'2026-06-26 14:31:51','2026-06-26 14:31:51',NULL);
+INSERT INTO `customers` (`id`, `company_id`, `user_id`, `name`, `document`, `email`, `phone`, `address`, `contact_type`, `is_active`, `created_at`, `updated_at`, `deleted_at`) VALUES (1,1,NULL,'Consumidor Final','222222222222',NULL,NULL,NULL,'person',1,'2026-06-26 14:31:51','2026-06-26 14:31:51',NULL);
 /*!40000 ALTER TABLE `customers` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -94,4 +94,3 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-

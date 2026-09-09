@@ -1082,7 +1082,7 @@
                     if (existing) {
                         const nextQuantity = this.toAmount(existing.quantity) + 1;
                         if (this.toAmount(existing.available_stock) > 0 && nextQuantity > this.toAmount(existing.available_stock)) {
-                            alert('No puedes vender una cantidad superior al stock disponible.');
+                            window.showSystemAlert('No puedes vender una cantidad superior al stock disponible.', { type: 'warning' });
                             return;
                         }
                         existing.quantity = nextQuantity;
@@ -1197,27 +1197,27 @@
                         return;
                     }
                     if (this.cart.length === 0) {
-                        alert('Agrega productos al carrito.');
+                        window.showSystemAlert('Agrega productos al carrito.', { type: 'warning' });
                         return;
                     }
                     if (!this.customerId) {
-                        alert('Debes seleccionar un cliente.');
+                        window.showSystemAlert('Debes seleccionar un cliente.', { type: 'warning' });
                         return;
                     }
                     if (this.cart.some(item => this.toAmount(item.available_stock) > 0 && this.toAmount(item.quantity) > this.toAmount(item.available_stock))) {
-                        alert('Hay productos con cantidad superior al stock disponible.');
+                        window.showSystemAlert('Hay productos con cantidad superior al stock disponible.', { type: 'warning' });
                         return;
                     }
                     if (JSON.parse(this.paymentsPayload).length === 0) {
-                        alert('Debes registrar al menos un pago.');
+                        window.showSystemAlert('Debes registrar al menos un pago.', { type: 'warning' });
                         return;
                     }
                     if (this.enteredTotal > this.total + 0.0001) {
-                        alert('La suma de pagos y credito no puede superar el total.');
+                        window.showSystemAlert('La suma de pagos y crédito no puede superar el total.', { type: 'warning' });
                         return;
                     }
                     if (this.coveredTotal < this.total) {
-                        alert('Pago mas credito insuficiente.');
+                        window.showSystemAlert('Pago más crédito insuficiente.', { type: 'warning' });
                         return;
                     }
                     const popupName = 'pos_invoice_popup';

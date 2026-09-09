@@ -42,7 +42,7 @@ class BusinessCurrencyTest extends TestCase
             'status' => 'open',
         ]);
 
-        $customerId = Customer::query()->where('document', 'CF')->value('id');
+        $customerId = Customer::query()->where('document', '222222222222')->value('id');
 
         $this->actingAs($admin)
             ->post(route('pos.checkout'), [
@@ -280,7 +280,7 @@ class BusinessCurrencyTest extends TestCase
             $this->assertDatabaseMissing('users', ['email' => 'supervisor@pos.test']);
             $this->assertDatabaseMissing('users', ['email' => 'cashier@pos.test']);
             $this->assertDatabaseCount('products', 0);
-            $this->assertDatabaseHas('customers', ['document' => 'CF']);
+            $this->assertDatabaseHas('customers', ['document' => '222222222222']);
             $this->assertDatabaseMissing('customers', ['document' => 'NIT-123456']);
         } finally {
             $this->setDemoSeedFlag(true);

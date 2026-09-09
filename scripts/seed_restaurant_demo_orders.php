@@ -11,7 +11,7 @@ $user = App\Models\User::query()->where('email', 'restaurant@pos.test')->firstOr
 $branchId = $user->branch_id;
 $companyId = $user->company_id;
 
-$customerId = App\Models\Customer::query()->where('document', 'CF')->value('id')
+$customerId = App\Models\Customer::query()->where('document', '222222222222')->value('id')
     ?? App\Models\Customer::query()->value('id');
 
 if (! $customerId) {

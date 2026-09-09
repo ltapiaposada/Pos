@@ -21,7 +21,7 @@ class AccountingCreditControlTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'admin@pos.test')->firstOrFail();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
@@ -143,7 +143,7 @@ class AccountingCreditControlTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'admin@pos.test')->firstOrFail();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,

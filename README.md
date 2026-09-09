@@ -81,7 +81,7 @@ Al correr `migrate --seed` o `migrate:fresh --seed`, se crean datos base:
 - Categorias base por defecto.
 - Roles y permisos base.
 - Contactos operativos base:
-  - `Cliente Mostrador` con identificacion `CF`.
+  - `Consumidor Final` con identificacion `222222222222`.
 - Si `SEED_DEMO_DATA=true`, tambien se crean:
   - `admin@pos.test` / `password`
   - `supervisor@pos.test` / `password`

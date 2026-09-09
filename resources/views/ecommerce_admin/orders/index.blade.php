@@ -173,7 +173,7 @@
                             @if (! $order->invoiced_at || ! $order->accounted_at)
                                 <form method="POST" action="{{ route('ecommerce-admin.orders.invoice', $order) }}">
                                     @csrf
-                                    <button type="submit" class="btn btn-primary btn-sm w-full" onclick="return confirm('Registrar venta o factura de este pedido?')">
+                                    <button type="submit" class="btn btn-primary btn-sm w-full" data-confirm="¿Registrar la venta o factura de este pedido?" data-confirm-action="Registrar">
                                         {{ ! $order->invoiced_at ? 'Registrar venta / factura' : 'Contabilizar factura' }}
                                     </button>
                                 </form>
@@ -223,7 +223,7 @@
                                         @if (! $order->invoiced_at || ! $order->accounted_at)
                                             <form method="POST" action="{{ route('ecommerce-admin.orders.invoice', $order) }}">
                                                 @csrf
-                                                <button type="submit" class="btn btn-primary btn-xs" onclick="return confirm('Registrar venta o factura de este pedido?')">
+                                                <button type="submit" class="btn btn-primary btn-xs" data-confirm="¿Registrar la venta o factura de este pedido?" data-confirm-action="Registrar">
                                                     {{ ! $order->invoiced_at ? 'Registrar venta / factura' : 'Contabilizar factura' }}
                                                 </button>
                                             </form>

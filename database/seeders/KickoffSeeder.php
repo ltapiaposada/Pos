@@ -2,11 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\Branch;
-use App\Models\Category;
 use App\Models\Company;
-use App\Models\Customer;
 use App\Models\User;
+use App\Services\CompanyKickoffService;
 use Database\Seeders\Concerns\SeedsDemoData;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -19,46 +17,21 @@ class KickoffSeeder extends Seeder
     {
         $this->call(RolePermissionSeeder::class);
 
+        $kickoff = app(CompanyKickoffService::class);
+
+        foreach (Company::query()->get() as $company) {
+            $kickoff->runIfPending($company);
+        }
+
         $company = Company::query()->first();
-
-        $mainBranch = Branch::query()->updateOrCreate(
-            ['code' => 'PRN'],
-            [
-                'company_id' => $company?->id,
-                'name' => 'Sucursal Principal',
-                'address' => 'Direccion principal',
-                'phone' => '000-0000',
-            ]
-        );
-
-        Category::query()->updateOrCreate(
-            ['name' => 'Bebidas'],
-            ['description' => 'Bebidas y refrescos']
-        );
-        Category::query()->updateOrCreate(
-            ['name' => 'Snacks'],
-            ['description' => 'Snacks y botanas']
-        );
-
-        Customer::query()->updateOrCreate(
-            ['document' => 'CF'],
-            [
-                'company_id' => $company?->id,
-                'name' => 'Cliente Mostrador',
-                'email' => null,
-                'phone' => null,
-                'address' => null,
-                'contact_type' => Customer::TYPE_PERSON,
-                'is_active' => true,
-            ]
-        );
+        $mainBranchId = $company?->branches()->orderBy('id')->value('id');
 
         if ($this->shouldSeedDemoData()) {
-            $this->createUser($company?->id, $mainBranch->id, 'admin@pos.test', 'Administrador', 'password', 'admin');
-            $this->createUser($company?->id, $mainBranch->id, 'supervisor@pos.test', 'Supervisor', 'password', 'supervisor');
-            $this->createUser($company?->id, $mainBranch->id, 'cashier@pos.test', 'Cajero', 'password', 'cashier');
+            $this->createUser($company?->id, $mainBranchId, 'admin@pos.test', 'Administrador', 'password', 'admin');
+            $this->createUser($company?->id, $mainBranchId, 'supervisor@pos.test', 'Supervisor', 'password', 'supervisor');
+            $this->createUser($company?->id, $mainBranchId, 'cashier@pos.test', 'Cajero', 'password', 'cashier');
         } else {
-            $this->createProductionAdmin($company?->id, $mainBranch->id);
+            $this->createProductionAdmin($company?->id, $mainBranchId);
         }
 
         // The global owner must be created explicitly per environment.

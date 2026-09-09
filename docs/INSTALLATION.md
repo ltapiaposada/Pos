@@ -43,7 +43,7 @@ Si `SEED_DEMO_DATA=true`:
 - `cashier@pos.test` / `password`
 
 ## Datos demo incluidos
-- `Cliente Mostrador` con identificacion `CF`
+- `Consumidor Final` con identificacion `222222222222`
 - `Empresa Demo` con identificacion `NIT-123456`
 - `Proveedor Base` con identificacion `NIT-PROV-001`
 - catalogo demo con inventario de ejemplo

@@ -32,6 +32,8 @@
             $initial = strtoupper(substr($user->name ?? 'U', 0, 1));
             $lowStockQuery = \App\Models\Inventory::query()
                 ->with(['product:id,name,sku', 'branch:id,name'])
+                ->whereHas('product')
+                ->whereHas('branch')
                 ->where('min_stock', '>', 0)
                 ->whereColumn('stock', '<=', 'min_stock');
             $lowStockTotal = (clone $lowStockQuery)->count();
@@ -101,16 +103,16 @@
                                 <div class="max-h-80 overflow-auto">
                                     @forelse ($lowStockItems as $item)
                                         <a
-                                            href="{{ route('inventory.index', ['branch_id' => $item->branch_id, 'q' => $item->product->name]) }}"
+                                            href="{{ route('inventory.index', ['branch_id' => $item->branch_id, 'q' => $item->product?->name]) }}"
                                             class="dropdown-item px-3 py-2"
                                         >
                                             <div class="flex items-center justify-between gap-2 text-sm">
-                                                <span class="font-semibold">{{ $item->product->name }}</span>
+                                                <span class="font-semibold">{{ $item->product?->name ?? 'Producto no disponible' }}</span>
                                                 <span class="badge text-bg-danger">
                                                     {{ number_format($item->stock, 3) }} / {{ number_format($item->min_stock, 3) }}
                                                 </span>
                                             </div>
-                                            <div class="text-[11px] text-base-content/60">{{ $item->branch->name }} · SKU {{ $item->product->sku }}</div>
+                                            <div class="text-[11px] text-base-content/60">{{ $item->branch?->name ?? 'Sucursal no disponible' }} · SKU {{ $item->product?->sku ?? 'N/D' }}</div>
                                         </a>
                                     @empty
                                         <div class="px-3 py-3 text-sm text-base-content/60">Sin productos en minimo.</div>
@@ -782,7 +784,10 @@
                     document.addEventListener('DOMContentLoaded', ensureMobileSidebarCollapsed, { once: true });
                 }
 
-                window.addEventListener('resize', ensureMobileSidebarCollapsed);
+                // Mobile browsers fire resize while their address bar appears or
+                // disappears during a scroll. Closing the sidebar on every resize
+                // makes it vanish while the user is navigating the menu.
+                window.addEventListener('orientationchange', ensureMobileSidebarCollapsed);
             })();
         </script>
         <script>

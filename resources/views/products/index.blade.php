@@ -60,7 +60,7 @@
                             <form action="{{ route('products.destroy', $product) }}" method="POST" class="inline">
                                 @csrf
                                 @method('DELETE')
-                                <button class="btn btn-outline-danger btn-xs" data-confirm="Eliminar producto?">Eliminar</button>
+                                <button type="submit" class="btn btn-outline-danger btn-xs" data-confirm="¿Eliminar producto?">Eliminar</button>
                             </form>
                         </div>
                     </article>
@@ -127,7 +127,7 @@
                                         <form action="{{ route('products.destroy', $product) }}" method="POST" class="inline">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="btn btn-outline-danger btn-xs" data-confirm="Eliminar producto?">Eliminar</button>
+                                            <button type="submit" class="btn btn-outline-danger btn-xs" data-confirm="¿Eliminar producto?">Eliminar</button>
                                         </form>
                                     </div>
                                 </td>

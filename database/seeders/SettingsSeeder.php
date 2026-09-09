@@ -3,13 +3,22 @@
 namespace Database\Seeders;
 
 use App\Models\Setting;
+use App\Models\Company;
 use Illuminate\Database\Seeder;
 
 class SettingsSeeder extends Seeder
 {
-    public function run(): void
+    public function run(?int $companyId = null): void
     {
-        $current = Setting::query()->where('key', 'business')->value('value') ?? [];
+        $companyId ??= Company::query()->orderBy('id')->value('id');
+        if ($companyId === null) {
+            return;
+        }
+
+        $current = Setting::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('key', 'business')
+            ->first()?->value ?? [];
         $default = [
             'name' => 'Mi Tienda POS',
             'nit' => 'NIT-000000',
@@ -23,7 +32,7 @@ class SettingsSeeder extends Seeder
         ];
 
         Setting::query()->updateOrCreate(
-            ['key' => 'business'],
+            ['company_id' => $companyId, 'key' => 'business'],
             ['value' => array_merge($default, is_array($current) ? $current : [])]
         );
     }

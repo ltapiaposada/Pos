@@ -10,9 +10,9 @@ class CustomerSeeder extends Seeder
     public function run(): void
     {
         Customer::query()->updateOrCreate(
-            ['document' => 'CF'],
+            ['document' => '222222222222'],
             [
-                'name' => 'Cliente Mostrador',
+                'name' => 'Consumidor Final',
                 'email' => null,
                 'phone' => null,
                 'address' => null,

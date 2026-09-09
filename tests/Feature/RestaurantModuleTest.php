@@ -32,7 +32,7 @@ class RestaurantModuleTest extends TestCase
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->firstOrFail();
         $this->markUserCompanyAsRestaurant($user);
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
@@ -212,7 +212,7 @@ class RestaurantModuleTest extends TestCase
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->firstOrFail();
         $this->markUserCompanyAsRestaurant($user);
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
@@ -308,7 +308,7 @@ class RestaurantModuleTest extends TestCase
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->firstOrFail();
         $this->markUserCompanyAsRestaurant($user);
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
@@ -373,7 +373,7 @@ class RestaurantModuleTest extends TestCase
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->firstOrFail();
         $this->markUserCompanyAsRestaurant($user);
-        $counterCustomer = Customer::where('document', 'CF')->firstOrFail();
+        $counterCustomer = Customer::where('document', '222222222222')->firstOrFail();
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
             'user_id' => $user->id,

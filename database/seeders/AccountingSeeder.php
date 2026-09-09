@@ -3,12 +3,18 @@
 namespace Database\Seeders;
 
 use App\Models\AccountingAccount;
+use App\Models\Company;
 use Illuminate\Database\Seeder;
 
 class AccountingSeeder extends Seeder
 {
-    public function run(): void
+    public function run(?int $companyId = null): void
     {
+        $companyId ??= Company::query()->orderBy('id')->value('id');
+        if ($companyId === null) {
+            return;
+        }
+
         $rows = [
             ['code' => '1', 'name' => 'Activo', 'type' => 'asset', 'nature' => 'debit', 'parent' => null, 'is_postable' => false],
             ['code' => '11', 'name' => 'Disponible', 'type' => 'asset', 'nature' => 'debit', 'parent' => '1', 'is_postable' => false],
@@ -47,11 +53,14 @@ class AccountingSeeder extends Seeder
         foreach ($rows as $row) {
             $parentId = null;
             if ($row['parent']) {
-                $parentId = AccountingAccount::query()->where('code', $row['parent'])->value('id');
+                $parentId = AccountingAccount::withoutGlobalScopes()
+                    ->where('company_id', $companyId)
+                    ->where('code', $row['parent'])
+                    ->value('id');
             }
 
             AccountingAccount::query()->updateOrCreate(
-                ['code' => $row['code']],
+                ['company_id' => $companyId, 'code' => $row['code']],
                 [
                     'name' => $row['name'],
                     'type' => $row['type'],

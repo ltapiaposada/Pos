@@ -479,7 +479,7 @@ CREATE TABLE `customers` (
 
 LOCK TABLES `customers` WRITE;
 /*!40000 ALTER TABLE `customers` DISABLE KEYS */;
-INSERT INTO `customers` VALUES (1,1,NULL,'Cliente Mostrador','CF',NULL,NULL,NULL,'person',1,'2026-08-29 06:06:36','2026-08-29 06:06:36',NULL),(2,1,NULL,'Empresa Demo','NIT-123456','facturas@demo.com','555-0303','Zona Industrial','company',1,'2026-08-29 06:07:06','2026-08-29 06:07:06',NULL),(3,1,NULL,'Proveedor Base','NIT-PROV-001','compras@proveedorbase.com','555-0404','Parque Industrial','supplier',1,'2026-08-29 06:07:06','2026-08-29 06:07:06',NULL);
+INSERT INTO `customers` VALUES (1,1,NULL,'Consumidor Final','222222222222',NULL,NULL,NULL,'person',1,'2026-08-29 06:06:36','2026-08-29 06:06:36',NULL),(2,1,NULL,'Empresa Demo','NIT-123456','facturas@demo.com','555-0303','Zona Industrial','company',1,'2026-08-29 06:07:06','2026-08-29 06:07:06',NULL),(3,1,NULL,'Proveedor Base','NIT-PROV-001','compras@proveedorbase.com','555-0404','Parque Industrial','supplier',1,'2026-08-29 06:07:06','2026-08-29 06:07:06',NULL);
 /*!40000 ALTER TABLE `customers` ENABLE KEYS */;
 UNLOCK TABLES;
 

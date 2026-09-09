@@ -92,7 +92,7 @@
                     @if (! $order->invoiced_at || ! $order->accounted_at)
                         <form method="POST" action="{{ route('ecommerce-admin.orders.invoice', $order) }}" class="mt-3">
                             @csrf
-                            <button type="submit" class="btn btn-outline btn-sm w-full" onclick="return confirm('Registrar venta o factura de este pedido?')">
+                            <button type="submit" class="btn btn-outline btn-sm w-full" data-confirm="¿Registrar la venta o factura de este pedido?" data-confirm-action="Registrar">
                                 {{ ! $order->invoiced_at ? 'Registrar venta / factura' : 'Contabilizar factura' }}
                             </button>
                         </form>

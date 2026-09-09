@@ -25,7 +25,7 @@ class SaleFlowTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->first();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
         $this->actingAs($user);
 
         $payload = [
@@ -54,7 +54,7 @@ class SaleFlowTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->first();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
             'user_id' => $user->id,
@@ -109,7 +109,7 @@ class SaleFlowTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->first();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
             'user_id' => $user->id,
@@ -181,7 +181,7 @@ class SaleFlowTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->firstOrFail();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
             'user_id' => $user->id,
@@ -264,7 +264,7 @@ class SaleFlowTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->firstOrFail();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,
@@ -389,7 +389,7 @@ class SaleFlowTest extends TestCase
     {
         $this->seed();
         $user = User::where('email', 'cashier@pos.test')->firstOrFail();
-        $customerId = Customer::where('document', 'CF')->value('id');
+        $customerId = Customer::where('document', '222222222222')->value('id');
 
         CashRegisterSession::create([
             'branch_id' => $user->branch_id,

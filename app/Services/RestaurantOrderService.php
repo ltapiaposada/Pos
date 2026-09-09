@@ -236,10 +236,10 @@ class RestaurantOrderService
                 $customerId = Customer::query()
                     ->where('is_active', true)
                     ->where(function ($query): void {
-                        $query->where('document', 'CF')
+                        $query->where('document', '222222222222')
                             ->orWhere('name', 'like', '%Mostrador%');
                     })
-                    ->orderByRaw("CASE WHEN document = 'CF' THEN 0 ELSE 1 END")
+                    ->orderByRaw("CASE WHEN document = '222222222222' THEN 0 ELSE 1 END")
                     ->value('id');
             }
 

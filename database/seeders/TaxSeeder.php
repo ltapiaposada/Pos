@@ -3,14 +3,20 @@
 namespace Database\Seeders;
 
 use App\Models\Tax;
+use App\Models\Company;
 use Illuminate\Database\Seeder;
 
 class TaxSeeder extends Seeder
 {
-    public function run(): void
+    public function run(?int $companyId = null): void
     {
+        $companyId ??= Company::query()->orderBy('id')->value('id');
+        if ($companyId === null) {
+            return;
+        }
+
         Tax::query()->updateOrCreate(
-            ['name' => 'IVA 16%'],
+            ['company_id' => $companyId, 'name' => 'IVA 16%'],
             [
                 'rate' => 16.00,
                 'is_active' => true,
@@ -18,7 +24,7 @@ class TaxSeeder extends Seeder
         );
 
         Tax::query()->updateOrCreate(
-            ['name' => 'Exento 0%'],
+            ['company_id' => $companyId, 'name' => 'Exento 0%'],
             [
                 'rate' => 0.00,
                 'is_active' => true,
