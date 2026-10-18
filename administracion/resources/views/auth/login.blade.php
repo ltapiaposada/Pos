@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ingresar · Administración Saturnext</title>
+    <style>
+        :root{--navy:#0d1b2a;--blue:#1769aa;--ink:#17212b;--muted:#607083;--line:#dbe4ee;--bg:#f6f8fb;--red:#b42318}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#edf5fb,#f6f8fb);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.card{width:min(410px,100%);background:#fff;border:1px solid var(--line);border-radius:16px;padding:32px;box-shadow:0 15px 45px rgba(25,50,75,.12)}h1{font-size:26px;margin:5px 0 8px}p{color:var(--muted);line-height:1.5;margin:0 0 22px}.brand{font-weight:850;color:var(--navy);font-size:19px}.brand span{color:var(--blue)}label{display:block;font-size:13px;font-weight:750;margin:14px 0 6px}input{width:100%;border:1px solid #cbd8e5;border-radius:8px;padding:11px;font:inherit}.check{display:flex;align-items:center;gap:7px;margin-top:14px;color:var(--muted);font-size:13px}.check input{width:auto}.button{width:100%;margin-top:21px;border:0;border-radius:8px;background:var(--blue);color:#fff;padding:11px;font:inherit;font-weight:800;cursor:pointer}.error{color:var(--red);font-size:13px;margin-top:6px}
+    </style>
+</head>
+<body><main class="card"><div class="brand">Saturn<span>ext</span></div><h1>Administración</h1><p>Ingresa con una cuenta de plataforma para administrar compañías, servicios, suscripciones y pagos.</p>@if(session('status'))<p style="background:#e8f2ea;color:#24653b;padding:10px;border-radius:8px;font-size:13px">{{ session('status') }}</p>@endif<form method="post" action="{{ route('login.store') }}">@csrf<label for="email">Correo</label><input id="email" type="email" name="email" value="{{ old('email') }}" autocomplete="email" required autofocus>@error('email')<div class="error">{{ $message }}</div>@enderror<label for="password">Contraseña</label><input id="password" type="password" name="password" autocomplete="current-password" required><label class="check"><input type="checkbox" name="remember" value="1"> Mantener mi sesión</label><a href="{{ route('password.request') }}" style="display:block;margin-top:14px;color:var(--blue);font-size:13px;font-weight:750">¿Olvidaste tu contraseña?</a><button class="button">Ingresar</button></form></main></body>
+</html>

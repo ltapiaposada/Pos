@@ -1,0 +1,18 @@
+{
+  "realm": "pos-platform",
+  "enabled": true,
+  "displayName": "POS Platform",
+  "roles": {
+    "realm": [
+      { "name": "platform_admin" },
+      { "name": "pos_user" },
+      { "name": "customer" }
+    ]
+  },
+  "clients": [
+    { "clientId": "pos-operativo", "enabled": true, "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "redirectUris": ["http://localhost:8000/*"], "webOrigins": ["http://localhost:8000"], "attributes": { "pkce.code.challenge.method": "S256" } },
+    { "clientId": "ecommerce", "enabled": true, "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "redirectUris": ["http://localhost:8001/*"], "webOrigins": ["http://localhost:8001"], "attributes": { "pkce.code.challenge.method": "S256" } },
+    { "clientId": "administracion", "enabled": true, "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "redirectUris": ["http://localhost:8002/*"], "webOrigins": ["http://localhost:8002"], "attributes": { "pkce.code.challenge.method": "S256" } },
+    { "clientId": "platform-services", "enabled": true, "publicClient": false, "serviceAccountsEnabled": true, "standardFlowEnabled": false, "directAccessGrantsEnabled": false, "secret": "replace-in-production" }
+  ]
+}

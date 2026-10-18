@@ -1,0 +1,50 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\BelongsToCompanyThroughBranch;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class CashMovement extends Model
+{
+    use BelongsToCompanyThroughBranch;
+    use HasFactory;
+
+    protected $fillable = [
+        'company_id',
+        'cash_register_session_id',
+        'branch_id',
+        'user_id',
+        'type',
+        'category',
+        'amount',
+        'reason',
+        'source_type',
+        'source_id',
+    ];
+
+    protected $casts = [
+        'amount' => 'decimal:2',
+    ];
+
+    public function session()
+    {
+        return $this->belongsTo(CashRegisterSession::class, 'cash_register_session_id');
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+}

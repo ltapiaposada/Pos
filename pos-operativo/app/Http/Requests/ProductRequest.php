@@ -1,0 +1,317 @@
+<?php
+
+namespace App\Http\Requests;
+
+use App\Models\Product;
+use App\Models\ProductModifierOption;
+use App\Support\CompanyContext;
+use App\Support\CompanyRules;
+use App\Support\UnitConverter;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
+
+class ProductRequest extends FormRequest
+{
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('uses_component_groups')) {
+            $this->merge(['uses_component_groups' => false]);
+        }
+    }
+
+    public function authorize(): bool
+    {
+        return $this->user()->can('manage_products');
+    }
+
+    public function rules(): array
+    {
+        $productId = $this->route('product')?->id;
+        $companyId = CompanyContext::authenticatedCompanyId();
+
+        return [
+            'category_id' => ['nullable', 'integer', CompanyRules::companyScoped('categories')],
+            'tax_id' => ['nullable', 'integer', CompanyRules::companyScoped('taxes')],
+            'name' => ['required', 'string', 'max:255'],
+            'sku' => ['required', 'string', 'max:64', Rule::unique('products', 'sku')->withoutTrashed()->where(fn ($query) => $query->where('company_id', $companyId))->ignore($productId)],
+            'barcode' => ['nullable', 'string', 'max:64', Rule::unique('products', 'barcode')->withoutTrashed()->where(fn ($query) => $query->where('company_id', $companyId))->ignore($productId)],
+            'image_url' => ['nullable', 'string', 'max:255'],
+            'image_file' => ['nullable', 'image', 'max:5120'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'delivery_instructions' => ['nullable', 'string', 'max:5000'],
+            'unit' => ['required', Rule::in(array_keys(Product::unitOptions()))],
+            'product_type' => ['required', Rule::in(Product::TYPES)],
+            'uses_component_groups' => ['required', 'boolean'],
+            'parent_product_id' => ['nullable', 'integer', CompanyRules::companyScoped('products')],
+            'cost_price' => ['required', 'numeric', 'min:0'],
+            'sale_price' => ['required', 'numeric', 'min:0'],
+            'is_active' => ['required', 'boolean'],
+            'is_visible_ecommerce' => ['required', 'boolean'],
+            'variants' => ['nullable', 'array'],
+            'variants.*.id' => ['nullable', 'integer', CompanyRules::companyScoped('products')],
+            'variants.*.name' => ['nullable', 'string', 'max:255'],
+            'variants.*.attributes' => ['nullable', 'array'],
+            'variants.*.attributes.*' => ['nullable', 'string', 'max:120'],
+            'variants.*.sku' => ['nullable', 'string', 'max:64'],
+            'variants.*.barcode' => ['nullable', 'string', 'max:64'],
+            'variants.*.cost_price' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.sale_price' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.unit' => ['nullable', Rule::in(array_keys(Product::unitOptions()))],
+            'variants.*.is_active' => ['nullable', 'boolean'],
+            'variants.*.is_visible_ecommerce' => ['nullable', 'boolean'],
+            'variant_attribute_definitions' => ['nullable', 'array'],
+            'variant_attribute_definitions.*.name' => ['nullable', 'string', 'max:120'],
+            'variant_attribute_definitions.*.values' => ['nullable', 'array'],
+            'variant_attribute_definitions.*.values.*' => ['nullable', 'string', 'max:120'],
+            'kit_items' => ['nullable', 'array'],
+            'kit_items.*.component_product_id' => ['required_with:kit_items.*.quantity', 'integer', CompanyRules::companyScoped('products')],
+            'kit_items.*.quantity' => ['required_with:kit_items.*.component_product_id', 'numeric', 'gt:0'],
+            'kit_items.*.component_unit' => ['nullable', Rule::in(array_keys(Product::unitOptions()))],
+            'kit_items.*.component_unit_factor' => ['nullable', 'numeric', 'gt:0'],
+            'modifier_groups' => ['nullable', 'array'],
+            'modifier_groups.*.name' => ['required_with:modifier_groups.*.selection_type', 'string', 'max:255'],
+            'modifier_groups.*.selection_type' => ['required_with:modifier_groups.*.name', Rule::in(array_keys(\App\Models\ProductModifierGroup::selectionTypeOptions()))],
+            'modifier_groups.*.is_required' => ['nullable', 'boolean'],
+            'modifier_groups.*.min_select' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'modifier_groups.*.max_select' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'modifier_groups.*.options' => ['nullable', 'array'],
+            'modifier_groups.*.options.*.product_id' => ['nullable', 'integer', CompanyRules::companyScoped('products')],
+            'modifier_groups.*.options.*.label' => ['required_with:modifier_groups.*.options.*.product_id', 'nullable', 'string', 'max:255'],
+            'modifier_groups.*.options.*.price_delta' => ['nullable', 'numeric', 'min:0'],
+            'modifier_groups.*.options.*.inventory_quantity' => ['nullable', 'numeric', 'gt:0'],
+            'modifier_groups.*.options.*.inventory_unit' => ['nullable', Rule::in(array_keys(Product::unitOptions()))],
+            'modifier_groups.*.options.*.inventory_unit_factor' => ['nullable', 'numeric', 'gt:0'],
+            'modifier_groups.*.options.*.is_default' => ['nullable', 'boolean'],
+            'modifier_groups.*.options.*.is_active' => ['nullable', 'boolean'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'sku.unique' => 'El SKU ya está siendo utilizado por otro producto activo.',
+            'barcode.unique' => 'El código de barras ya está siendo utilizado por otro producto activo.',
+        ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $type = $this->input('product_type');
+            $usesComponentGroups = $this->boolean('uses_component_groups');
+            $productId = $this->route('product')?->id;
+            $parentProductId = $this->input('parent_product_id');
+            $variants = collect($this->input('variants', []))
+                ->filter(fn ($variant) => ! empty($variant['sku']) || ! empty($variant['name']) || collect($variant['attributes'] ?? [])->filter()->isNotEmpty())
+                ->values();
+            $legacyModifierOptionIds = ProductModifierOption::query()
+                ->whereIn('id', collect($this->input('modifier_groups', []))
+                    ->flatMap(fn ($group) => collect($group['options'] ?? [])->pluck('id'))
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->all())
+                ->whereNull('product_id')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $kitItems = collect($this->input('kit_items', []))
+                ->filter(fn ($item) => ! empty($item['component_product_id']));
+
+            if ($type === Product::TYPE_VARIANT) {
+                if (! $parentProductId && $variants->isEmpty()) {
+                    $validator->errors()->add('parent_product_id', 'Debes seleccionar un producto base para la variante.');
+                }
+
+                if ($productId && (int) $parentProductId === (int) $productId) {
+                    $validator->errors()->add('parent_product_id', 'Una variante no puede apuntarse a si misma.');
+                }
+
+                $parentType = Product::query()->whereKey($parentProductId)->value('product_type');
+                if ($parentType === Product::TYPE_VARIANT) {
+                    $validator->errors()->add('parent_product_id', 'El producto base no puede ser otra variante.');
+                }
+
+                if (! $parentProductId) {
+                    if ($variants->isEmpty()) {
+                        $validator->errors()->add('variants', 'Debes agregar al menos una variante al producto.');
+                    }
+
+                    $skus = $variants->pluck('sku')->filter()->map(fn ($sku) => mb_strtolower(trim((string) $sku)));
+                    if ($skus->count() !== $skus->unique()->count()) {
+                        $validator->errors()->add('variants', 'No puedes repetir SKU entre variantes.');
+                    }
+
+                    $barcodes = $variants->pluck('barcode')->filter()->map(fn ($barcode) => mb_strtolower(trim((string) $barcode)));
+                    if ($barcodes->count() !== $barcodes->unique()->count()) {
+                        $validator->errors()->add('variants', 'No puedes repetir codigos de barras entre variantes.');
+                    }
+
+                    $companyId = CompanyContext::authenticatedCompanyId();
+                    $variants->each(function (array $variant, int $index) use ($validator, $companyId): void {
+                        if (empty($variant['sku'])) {
+                            $validator->errors()->add("variants.{$index}.sku", 'Cada variante debe tener SKU.');
+                        }
+                        if (collect($variant['attributes'] ?? [])->filter()->isEmpty() && empty($variant['name'])) {
+                            $validator->errors()->add("variants.{$index}.name", 'Indica al menos un atributo o nombre para la variante.');
+                        }
+
+                        if (! empty($variant['sku'])) {
+                            $exists = Product::query()
+                                ->where('company_id', $companyId)
+                                ->where('sku', $variant['sku'])
+                                ->when(! empty($variant['id']), fn ($query) => $query->whereKeyNot((int) $variant['id']))
+                                ->exists();
+                            if ($exists) {
+                                $validator->errors()->add("variants.{$index}.sku", 'El SKU de la variante ya esta en uso.');
+                            }
+                        }
+
+                        if (! empty($variant['barcode'])) {
+                            $exists = Product::query()
+                                ->where('company_id', $companyId)
+                                ->where('barcode', $variant['barcode'])
+                                ->when(! empty($variant['id']), fn ($query) => $query->whereKeyNot((int) $variant['id']))
+                                ->exists();
+                            if ($exists) {
+                                $validator->errors()->add("variants.{$index}.barcode", 'El codigo de barras de la variante ya esta en uso.');
+                            }
+                        }
+                    });
+                }
+            }
+
+            if ($type !== Product::TYPE_VARIANT && $parentProductId) {
+                $validator->errors()->add('parent_product_id', 'Solo las variantes pueden tener producto base.');
+            }
+
+            if ($type !== Product::TYPE_KIT && $usesComponentGroups) {
+                $validator->errors()->add('uses_component_groups', 'Solo los productos tipo kit pueden manejar grupos de componentes.');
+            }
+
+            if ($type === Product::TYPE_KIT && ! $usesComponentGroups) {
+                if ($kitItems->isEmpty()) {
+                    $validator->errors()->add('kit_items', 'Debes agregar al menos un componente al kit.');
+                }
+
+                $componentIds = $kitItems->pluck('component_product_id');
+                if ($componentIds->count() !== $componentIds->unique()->count()) {
+                    $validator->errors()->add('kit_items', 'No puedes repetir componentes dentro del kit.');
+                }
+
+                if ($productId && $componentIds->contains((int) $productId)) {
+                    $validator->errors()->add('kit_items', 'Un kit no puede incluirse a si mismo como componente.');
+                }
+
+                $kitItems->each(function (array $item, int $index) use ($validator): void {
+                    $stockUnit = Product::query()
+                        ->whereKey($item['component_product_id'] ?? null)
+                        ->value('unit');
+                    $hasAutomaticConversion = UnitConverter::factor($item['component_unit'] ?? $stockUnit, $stockUnit) !== null;
+
+                    if (! $hasAutomaticConversion && (empty($item['component_unit_factor']) || (float) $item['component_unit_factor'] <= 0)) {
+                        $validator->errors()->add("kit_items.{$index}.component_unit_factor", 'Debes indicar el factor de conversion hacia la unidad de stock.');
+                    }
+                });
+            }
+
+            $modifierGroups = collect($this->input('modifier_groups', []))
+                ->filter(fn ($group) => ! empty($group['name']))
+                ->values();
+
+            if ($type === Product::TYPE_KIT && $usesComponentGroups && $modifierGroups->isEmpty()) {
+                $validator->errors()->add('modifier_groups', 'Debes agregar al menos un grupo de componentes al kit.');
+            }
+
+            $modifierGroups
+                ->each(function (array $group, int $groupIndex) use ($validator, $productId, $legacyModifierOptionIds): void {
+                    $type = $group['selection_type'] ?? null;
+                    $minSelect = (int) ($group['min_select'] ?? 0);
+                    $maxSelect = (int) ($group['max_select'] ?? 0);
+                    $options = collect($group['options'] ?? [])
+                        ->filter(fn ($option) => ! empty($option['label']) || ! empty($option['product_id']))
+                        ->values();
+
+                    if ($options->isEmpty()) {
+                        $validator->errors()->add("modifier_groups.{$groupIndex}.options", 'Cada grupo de componentes debe tener al menos una opción.');
+
+                        return;
+                    }
+
+                    $optionKeys = $options->map(fn ($option) => (string) ($option['product_id'] ?? '').'|'.mb_strtolower(trim((string) ($option['label'] ?? ''))));
+                    if ($optionKeys->count() !== $optionKeys->unique()->count()) {
+                        $validator->errors()->add("modifier_groups.{$groupIndex}.options", 'No puedes repetir opciones dentro del mismo grupo.');
+                    }
+
+                    if ($productId && $options->pluck('product_id')->filter()->contains((int) $productId)) {
+                        $validator->errors()->add("modifier_groups.{$groupIndex}.options", 'Un producto no puede referenciarse a si mismo como opción.');
+                    }
+
+                    if ($type === \App\Models\ProductModifierGroup::TYPE_SINGLE) {
+                        if ($maxSelect === 0) {
+                            $maxSelect = 1;
+                        }
+                        if ($maxSelect !== 1) {
+                            $validator->errors()->add("modifier_groups.{$groupIndex}.max_select", 'Los grupos de selección única deben permitir exactamente una opción.');
+                        }
+                        if ($group['is_required'] ?? false) {
+                            if ($minSelect !== 1) {
+                                $validator->errors()->add("modifier_groups.{$groupIndex}.min_select", 'Si el grupo es obligatorio debes exigir una opción.');
+                            }
+                        }
+                    }
+
+                    if (in_array($type, [
+                        \App\Models\ProductModifierGroup::TYPE_SINGLE,
+                        \App\Models\ProductModifierGroup::TYPE_MULTIPLE,
+                    ], true)) {
+                        $options->each(function (array $option, int $optionIndex) use ($validator, $groupIndex, $legacyModifierOptionIds): void {
+                            $isLegacyOption = ! empty($option['id'])
+                                && empty($option['product_id'])
+                                && in_array((int) $option['id'], $legacyModifierOptionIds, true);
+
+                            if ($isLegacyOption) {
+                                return;
+                            }
+
+                            if (empty($option['product_id'])) {
+                                $validator->errors()->add(
+                                    "modifier_groups.{$groupIndex}.options.{$optionIndex}.product_id",
+                                    'Las opciones de seleccion deben apuntar a un producto existente.'
+                                );
+                            }
+
+                            if (empty($option['inventory_quantity']) || (float) $option['inventory_quantity'] <= 0) {
+                                $validator->errors()->add(
+                                    "modifier_groups.{$groupIndex}.options.{$optionIndex}.inventory_quantity",
+                                    'Debes indicar la cantidad consumida por esta opcion.'
+                                );
+                            }
+
+                            $stockUnit = Product::query()
+                                ->whereKey($option['product_id'] ?? null)
+                                ->value('unit');
+                            $hasAutomaticConversion = UnitConverter::factor($option['inventory_unit'] ?? $stockUnit, $stockUnit) !== null;
+
+                            if (! $hasAutomaticConversion && (empty($option['inventory_unit_factor']) || (float) $option['inventory_unit_factor'] <= 0)) {
+                                $validator->errors()->add(
+                                    "modifier_groups.{$groupIndex}.options.{$optionIndex}.inventory_unit_factor",
+                                    'Debes indicar el factor de conversion hacia la unidad de stock.'
+                                );
+                            }
+                        });
+                    }
+
+                    if ($type === \App\Models\ProductModifierGroup::TYPE_REMOVE) {
+                        if (! $options->every(fn ($option) => (bool) ($option['is_default'] ?? false))) {
+                            $validator->errors()->add("modifier_groups.{$groupIndex}.options", 'En grupos para quitar ingredientes, todas las opciones deben venir marcadas por defecto.');
+                        }
+                    }
+
+                    if ($maxSelect > 0 && $minSelect > $maxSelect) {
+                        $validator->errors()->add("modifier_groups.{$groupIndex}.min_select", 'El mínimo no puede ser mayor que el máximo.');
+                    }
+                });
+        });
+    }
+}

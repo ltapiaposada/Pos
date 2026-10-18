@@ -1,0 +1,23 @@
+<?php
+
+namespace App\Http\Requests;
+
+use App\Support\CompanyRules;
+use Illuminate\Foundation\Http\FormRequest;
+
+class CashRegisterCloseRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user()->can('close_cash_register');
+    }
+
+    public function rules(): array
+    {
+        return [
+            'branch_id' => ['required', 'integer', CompanyRules::companyScoped('branches')],
+            'closing_amount' => ['required', 'numeric', 'min:0'],
+            'difference_reason' => ['nullable', 'string', 'max:500'],
+        ];
+    }
+}

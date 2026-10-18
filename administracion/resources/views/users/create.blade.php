@@ -1,0 +1,4 @@
+@extends('layouts.admin')
+@section('content')
+<p class="eyebrow">Directorio operativo</p><h1>Crear usuario</h1><p>Se crea directamente en el POS de la compañía seleccionada.</p><section class="panel" style="max-width:700px"><form method="post" action="{{ route('users.store') }}">@csrf<label>Compañía</label><select name="company_id">@foreach($companies as $company)<option value="{{ $company->id }}">{{ $company->name }}</option>@endforeach</select><label>Nombre</label><input name="name" value="{{ old('name') }}" required><label>Correo</label><input name="email" type="email" value="{{ old('email') }}" required>@error('email')<div class="error">{{ $message }}</div>@enderror<label>Estado</label><select name="is_active"><option value="1">Activo</option><option value="0">Inactivo</option></select><button class="button" style="margin-top:17px">Crear usuario</button></form></section>
+@endsection

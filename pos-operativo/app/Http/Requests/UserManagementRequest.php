@@ -1,0 +1,37 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+
+class UserManagementRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return $this->user()->can('manage_users');
+    }
+
+    public function rules(): array
+    {
+        $userId = $this->route('user')?->id;
+        $passwordRules = $this->isMethod('post')
+            ? ['required', 'string', 'min:8', 'confirmed']
+            : ['nullable', 'string', 'min:8', 'confirmed'];
+        $allowedRoles = Role::query()->pluck('name')->all();
+        $allowedPermissions = Permission::query()->pluck('name')->all();
+
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'password' => $passwordRules,
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', Rule::in($allowedRoles)],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', Rule::in($allowedPermissions)],
+        ];
+    }
+}

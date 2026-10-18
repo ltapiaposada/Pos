@@ -1,0 +1,117 @@
+name: pos-platform
+
+services:
+  pos-operativo:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    working_dir: /var/www
+    command: sh -lc "composer install --no-interaction && php artisan serve --host=0.0.0.0 --port=8000"
+    environment:
+      APP_ENV: local
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: mysql
+      DB_HOST: pos-db
+      DB_DATABASE: pos_core
+      DB_USERNAME: pos
+      DB_PASSWORD: pos_secret
+      INTERNAL_API_TOKEN: local-internal-token
+      ECOMMERCE_API_URL: http://ecommerce:8001
+    volumes:
+      - ./pos-operativo:/var/www
+    ports:
+      - "8000:8000"
+    depends_on:
+      pos-db:
+        condition: service_healthy
+
+  ecommerce:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    working_dir: /var/www
+    command: sh -lc "composer install --no-interaction && php artisan serve --host=0.0.0.0 --port=8001"
+    environment:
+      APP_ENV: local
+      APP_URL: http://localhost:8001
+      DB_CONNECTION: mysql
+      DB_HOST: pos-db
+      DB_DATABASE: pos_core
+      DB_USERNAME: pos
+      DB_PASSWORD: pos_secret
+      MIGRATIONS_TABLE: ecommerce_migrations
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      INTERNAL_API_TOKEN: local-internal-token
+      POS_API_URL: http://pos-operativo:8000
+    volumes:
+      - ./ecommerce:/var/www
+    ports:
+      - "8001:8001"
+    depends_on:
+      pos-db:
+        condition: service_healthy
+
+  administracion:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    working_dir: /var/www
+    command: sh -lc "composer install --no-interaction && php artisan serve --host=0.0.0.0 --port=8002"
+    environment:
+      APP_ENV: local
+      APP_URL: http://localhost:8002
+      DB_CONNECTION: mysql
+      DB_HOST: administracion-db
+      DB_DATABASE: administracion
+      DB_USERNAME: administracion
+      DB_PASSWORD: administracion_secret
+      MIGRATIONS_TABLE: administracion_migrations
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      INTERNAL_API_TOKEN: local-internal-token
+      POS_API_URL: http://pos-operativo:8000
+      ECOMMERCE_API_URL: http://ecommerce:8001
+    volumes:
+      - ./administracion:/var/www
+    ports:
+      - "8002:8002"
+    depends_on:
+      administracion-db:
+        condition: service_healthy
+
+  pos-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: pos_core
+      MYSQL_USER: pos
+      MYSQL_PASSWORD: pos_secret
+      MYSQL_ROOT_PASSWORD: root_secret
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - pos_db_data:/var/lib/mysql
+
+  administracion-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: administracion
+      MYSQL_USER: administracion
+      MYSQL_PASSWORD: administracion_secret
+      MYSQL_ROOT_PASSWORD: root_secret
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - administracion_db_data:/var/lib/mysql
+
+volumes:
+  pos_db_data:
+  administracion_db_data:

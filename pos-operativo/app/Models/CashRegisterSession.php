@@ -1,0 +1,57 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\BelongsToCompanyThroughBranch;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class CashRegisterSession extends Model
+{
+    use BelongsToCompanyThroughBranch;
+    use HasFactory;
+
+    protected $fillable = [
+        'company_id',
+        'branch_id',
+        'user_id',
+        'opened_at',
+        'closed_at',
+        'opening_amount',
+        'closing_amount',
+        'expected_amount',
+        'difference',
+        'difference_reason',
+        'status',
+        'open_marker',
+    ];
+
+    protected $casts = [
+        'opened_at' => 'datetime',
+        'closed_at' => 'datetime',
+        'opening_amount' => 'decimal:2',
+        'closing_amount' => 'decimal:2',
+        'expected_amount' => 'decimal:2',
+        'difference' => 'decimal:2',
+    ];
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function cashMovements()
+    {
+        return $this->hasMany(CashMovement::class);
+    }
+}
