@@ -1,6 +1,6 @@
--- Crear la base administrativa vacía.
--- Ejecutar con un usuario MySQL que tenga permiso CREATE DATABASE.
--- Es seguro ejecutarlo más de una vez: no elimina una base existente.
+-- Compatibilidad: para una instalación nueva usa 00_crear_bases_datos.sql,
+-- que crea tanto pos_core como administracion.
+-- Este archivo solo crea la base administrativa.
 
 CREATE DATABASE IF NOT EXISTS `administracion`
     CHARACTER SET utf8mb4

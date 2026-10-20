@@ -141,6 +141,17 @@ CREATE TABLE IF NOT EXISTS `ecommerce_inbound_events` (
     UNIQUE KEY `inbound_events_event_uuid_unique` (`event_uuid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla final de restablecimiento de contraseña de compradores. Los contactos
+-- pertenecen al POS; ecommerce_customers fue temporal y ya no se utiliza.
+CREATE TABLE IF NOT EXISTS ecommerce_customer_password_resets (
+    company_id bigint unsigned NOT NULL,
+    email varchar(255) NOT NULL,
+    token varchar(255) NOT NULL,
+    created_at timestamp NULL DEFAULT NULL,
+    external_customer_uuid char(36) NULL DEFAULT NULL,
+    PRIMARY KEY (company_id, email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Impide que Laravel vuelva a ejecutar las migraciones ya representadas aquí.
 INSERT IGNORE INTO `migrations` (`migration`, `batch`)
 VALUES ('2026_10_15_000000_add_platform_integration_fields', 999);
@@ -148,6 +159,9 @@ VALUES ('2026_10_15_000000_add_platform_integration_fields', 999);
 INSERT IGNORE INTO `ecommerce_migrations` (`migration`, `batch`)
 VALUES
     ('2026_10_15_000000_create_ecommerce_platform_tables', 1),
-    ('2026_10_18_020000_replace_tenant_uuid_with_administrative_company_id', 1);
+    ('2026_10_18_020000_replace_tenant_uuid_with_administrative_company_id', 1),
+    ('2026_10_18_050000_create_ecommerce_customers_table', 1),
+    ('2026_10_18_060000_scope_ecommerce_customer_emails_and_password_resets', 1),
+    ('2026_10_18_070000_remove_duplicated_ecommerce_customers', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

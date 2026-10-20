@@ -73,7 +73,10 @@ php artisan route:cache
 php artisan view:cache
 ```
 
-Ejecutar primero POS, luego e-commerce y finalmente administración. E-commerce no tiene las migraciones Laravel genéricas para evitar que cree tablas que ya pertenecen al POS.
+Ejecutar primero Administración, luego POS y finalmente e-commerce.
+Administración debe existir antes de POS porque contiene el maestro de
+compañías. E-commerce no tiene migraciones Laravel genéricas para evitar que
+cree tablas que ya pertenecen al POS.
 
 ## Operación sin workers
 

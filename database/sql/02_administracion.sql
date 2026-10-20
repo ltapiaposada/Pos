@@ -213,4 +213,32 @@ INSERT IGNORE INTO `administracion_migrations` (`migration`, `batch`) VALUES
     ('0001_01_01_000001_create_cache_table', 1),
     ('0001_01_01_000002_create_jobs_table', 1),
     ('2026_10_15_000000_create_platform_administration_tables', 1),
-    ('2026_10_18_010000_rename_tenants_as_companies_and_remove_company_foreign_keys', 1);
+    ('2026_10_18_010000_rename_tenants_as_companies_and_remove_company_foreign_keys', 1),
+    ('2026_10_18_030000_create_client_payments_table', 1),
+    ('2026_10_18_040000_add_legacy_pos_subscription_id_to_subscriptions_table', 1);
+
+-- Campos y tabla añadidos por las migraciones posteriores al esquema inicial.
+ALTER TABLE subscriptions
+    ADD COLUMN legacy_pos_subscription_id bigint unsigned DEFAULT NULL,
+    ADD UNIQUE KEY subscriptions_legacy_pos_subscription_id_unique (legacy_pos_subscription_id);
+
+CREATE TABLE IF NOT EXISTS client_payments (
+    id bigint unsigned NOT NULL AUTO_INCREMENT,
+    company_id bigint unsigned NOT NULL,
+    subscription_id bigint unsigned DEFAULT NULL,
+    amount decimal(12,2) NOT NULL,
+    currency varchar(3) NOT NULL DEFAULT 'COP',
+    status varchar(20) NOT NULL DEFAULT 'pending',
+    due_date date DEFAULT NULL,
+    paid_at timestamp NULL DEFAULT NULL,
+    method varchar(50) DEFAULT NULL,
+    reference varchar(100) DEFAULT NULL,
+    notes text DEFAULT NULL,
+    created_at timestamp NULL DEFAULT NULL,
+    updated_at timestamp NULL DEFAULT NULL,
+    PRIMARY KEY (id),
+    KEY client_payments_company_id_index (company_id),
+    KEY client_payments_subscription_id_index (subscription_id),
+    KEY client_payments_status_index (status),
+    KEY client_payments_due_date_index (due_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
